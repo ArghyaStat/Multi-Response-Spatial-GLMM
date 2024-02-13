@@ -1,22 +1,29 @@
-rm(list = ls())
+###################################
+## No covariate model, with only
+## unknown range parameter
+## Look at ----- overleaf for theory
+###################################
 
 set.seed(3019)
 
 
-mydir <- "C:/Users/Arghya/Documents/GitHub/Multi-Response-Spatial-GLMM"
-setwd(mydir)
 
 # Simulating with  Phi = 0.1
 
 library(fields)
 library(plot3D)
 library(geoR)
+library(SimTools)
 
 N <- 2e2 # No. of spatial locations 
 
-loc <- cbind(runif(N), runif(N)) #simulating 100 locations
+loc <- matrix(0, nrow = N, ncol = 2)
+loc[, 1] <- runif(N)
+loc[, 2] <- runif(N) #simulating 100 locations
 plot(loc)
-true_phi <- 0.1   #true value of phi
+
+
+true_phi <- 0.1  #true value of phi
 
 
 d <- rdist(loc) # Calculates the Euclidean distance matrix
@@ -34,7 +41,6 @@ scatter2D(x = loc[ , 1], y = loc[ , 2], colvar = Y, pch = 15)
 # log likelihood of phi using cholesky decomposition
 
 loglike_phi <- function(phi, Y){
-    
     
     if(phi > 0){
       
@@ -55,31 +61,29 @@ loglike_phi <- function(phi, Y){
 
 target_phi <- function(phi, Y){
   
-  return(loglike_phi(phi, Y) + dunif(phi, 0, 1, log = T))
+  return(loglike_phi(phi, Y) + dunif(phi, 0, 1, log = TRUE))
 }
 
 # Metropolis-Hastings Algorithm
 
-mh_phi <- function(phi.init, iters, burnin){
+mh_phi <- function(phi.init, iters, burnin = 0, h = 0.1){
   
-  phi.chain <- array(dim = c(iters + burnin, 1))
+  phi.chain <- numeric(length = (iters + burnin) )
   phi.chain[1] <- phi.init 
-  
+  accept <- 0
+  errors <- rnorm(iters + burnin, sd = h)
   for (i in 2:(iters + burnin))
   {
     
     # Gaussian proposal with SD = 0.1
+    if(i %% ((iters+burnin)/10) == 0) print( paste0(100*(i/(iters + burnin)), "%"))
     
-    proposal <- rnorm(n = 1, mean = phi.chain[i-1], sd = 0.1) 
+    proposal <- phi.chain[i-1] + errors[i]
+    log.r = target_phi(proposal, Y) - target_phi(phi.chain[i-1], Y) 
     
-    r = exp(target_phi(proposal, Y) - target_phi(phi.chain[i-1], Y))
-    
-    
-    acc_ratio = min(r,1)
-    
-    
-    if(runif(1) < acc_ratio){
+    if(log(runif(1)) < log.r){
       
+      accept <- accept + 1
       phi.chain[i] = proposal
       
     } else {
@@ -87,19 +91,16 @@ mh_phi <- function(phi.init, iters, burnin){
       phi.chain[i] = phi.chain[i-1]
       
     }
-    
   }
-  
-  
+  print(paste("Acceptance = ", (accept/(iters + burnin))))
   return(phi.chain)
-  
 }
 
-MCMC.out <- mh_phi(phi.init = 0.5, iters <- 2e3, burnin <- 0)
+MCMC.out <- mh_phi(phi.init = 0.1, iters = 2e3, h = .1)
 
 # acceptance rate
 
-acceptance = 1 - mean(duplicated(phi.chain[-(1:burnin)]))
+(acceptance = 1 - mean(duplicated(MCMC.out)))
 
 
 # Plotting the MCMC output
@@ -112,5 +113,11 @@ abline(h = true_phi, col = 'blue', lwd = 2)
 
 p2 <- acf(MCMC.out)
 
+## Output analysis using SimTools
+traceplot(MCMC.out)
+abline(h = true_phi, col = "blue")
+acfplot(MCMC.out)
+out <- as.Smcmc(MCMC.out)
+plot(out)
 
 #---------------------
