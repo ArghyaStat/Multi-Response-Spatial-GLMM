@@ -4,16 +4,17 @@
 ## Look at ----- overleaf for theory
 ###################################
 
-set.seed(3019)
 
+library(devtools)
+install_github("https://github.com/dvats/SimTools/tree/Siddharth-Pathak")
 
-
-# Simulating with  Phi = 0.1
+# Simulating with  phi = 0.1
 
 library(fields)
 library(plot3D)
 library(geoR)
 library(SimTools)
+library(dev)
 
 N <- 2e2 # No. of spatial locations 
 
@@ -66,7 +67,7 @@ target_phi <- function(phi, Y){
 
 # Metropolis-Hastings Algorithm
 
-mh_phi <- function(phi.init, iters, burnin = 0, h = 0.1){
+mh_phi <- function(phi.init, iters, burnin = 0, h = 0.05){
   
   phi.chain <- numeric(length = (iters + burnin) )
   phi.chain[1] <- phi.init 
@@ -96,7 +97,7 @@ mh_phi <- function(phi.init, iters, burnin = 0, h = 0.1){
   return(phi.chain)
 }
 
-MCMC.out <- mh_phi(phi.init = 0.1, iters = 2e3, h = .1)
+MCMC.out <- mh_phi(phi.init = 0.8, iters = 2e3, h = .05)
 
 # acceptance rate
 
@@ -107,16 +108,18 @@ MCMC.out <- mh_phi(phi.init = 0.1, iters = 2e3, h = .1)
 
 par(mfrow = c(1, 2))
 
-p1 <- plot(MCMC.out, xlab = "Iteration", ylab = "phi", type = "l", 
-          main = "Trace plot of phi")
+p1 <- plot(MCMC.out, xlim = c(0, 2000), ylim = c(0,1), xlab = "Iteration", 
+           ylab = "phi", type = "l", 
+           main = "Trace plot of phi")
 abline(h = true_phi, col = 'blue', lwd = 2)
 
-p2 <- acf(MCMC.out)
+p2 <- acf(MCMC.out, main = "ACF plot of phi", lag.max = 100)
 
 ## Output analysis using SimTools
-traceplot(MCMC.out)
+traceplot(MCMC.out, ylab = "phi",
+          main = "Trace plot of phi")
 abline(h = true_phi, col = "blue")
-acfplot(MCMC.out)
+acfplot(MCMC.out, lag.max = 100, main = "ACF plot of phi")
 out <- as.Smcmc(MCMC.out)
 plot(out)
 
