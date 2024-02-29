@@ -14,7 +14,7 @@ N <- 2e2 # No. of spatial locations
 locations <- matrix(0, nrow = N, ncol = 2)
 
 locations[, 1] <- runif(N)
-locations[, 2] <- runif(N) #simulating 100 locations
+locations[, 2] <- runif(N) #simulating N locations
 
 
 plot(locations)
@@ -26,9 +26,7 @@ cov <- exp(-d/true_phi) # Calculates the correlation matrix
 Y <- c(t(chol(cov)) %*% rnorm(N)) # Draws a sample from multivariate normal
 
 
-# Step 1: Save the C++ code to a file named source.cpp
-
-# Step 2: Compile the C++ code
+# Calling the C++ code from a file named mcmc_with_phi.cpp
 
 
 sourceCpp("mcmc_with_phi.cpp")
@@ -43,4 +41,4 @@ h <- 0.05
 
 
 # Run the Metropolis-Hastings algorithm
-phi_chain <- metropolis_hastings(init_phi = 0.5, nu = 1, niters = 1000, h = 0.05, Y = Y, locations = locations)
+phi_chain <- metropolis_hastings(init_phi = 0.5, nu = 0.5, niters = 1000, h = 0.05, Y = Y, locations = locations)
