@@ -1,9 +1,3 @@
-rm(list = ls())
-
-my_dir <- "C:/Users/HP/OneDrive - IIT Kanpur/arghya/IIT Kanpur PhD documents/Spatial and MCMC Research/Project1/Computing/Rcpp codes"
-
-setwd(my_dir)
-
 
 # Data Simulation
 
