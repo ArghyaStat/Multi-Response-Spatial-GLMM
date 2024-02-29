@@ -83,7 +83,7 @@ double log_likelihood(double phi, double nu, NumericVector Y, NumericVector loca
     // Check if phi is within (0, 1)
     if (phi <= 0 || phi >= 1) return -INFINITY;
 
-    int n = Y.size();
+    // int n = Y.size();
 
     // Compute covariance matrix K
     NumericMatrix K = compute_covariance_matrix(locations, phi, nu);
