@@ -50,7 +50,7 @@ NumericMatrix cholesky(NumericMatrix A) {
     return L;
 }
 
-// Cholesky decomposition of inverse function
+// Cholesky decomposition of the inverse function
 NumericMatrix cholesky_inverse(NumericMatrix L) {
     int n = L.nrow();
     NumericMatrix L_inv(n, n);
@@ -95,13 +95,10 @@ double log_likelihood(double phi, double nu, NumericVector Y, NumericVector loca
     NumericMatrix L_inv = cholesky_inverse(L);
 
     // Compute log-likelihood
-    double loglik = -0.5 * (n * log(2 * M_PI) +
-        2 * std::accumulate(L.begin(), L.end(), 0.0,
-            [](double acc, double val) {
-                return acc + log(val);
-            }) +
-        std::inner_product(Y.begin(), Y.end(), Y.begin(), 0.0));
-
+    NumericVector y_vec(Y);
+    NumericVector y_trans = L_inv * y_vec;
+    double loglik = -0.5 * (2 * sum(log(diag(L))) +
+    sum(pow(y_trans, 2)));
     return loglik;
 }
 
