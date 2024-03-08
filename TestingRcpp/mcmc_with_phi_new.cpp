@@ -6,12 +6,13 @@
 #include <RcppArmadillo.h>
 
 using namespace Rcpp;
-
+// Metropolis-Hastings algorithm to sample phi
+// [[Rcpp::export]]
 // Matern covariance function
 double matern(double dist, double phi, double nu) {
     double out;
     if (dist == 0.0) {
-        out = 1.0; // Covariance at the same point is 1
+        out = 0.0; // Covariance at the same point is 1
     }
     else {
         double kappa = sqrt(2 * nu) / phi;
@@ -19,27 +20,30 @@ double matern(double dist, double phi, double nu) {
         double part2 = kappa * dist;
 
         // Print out values for debugging
-        Rcpp::Rcout << "part2: " << part2 << ", nu: " << nu << std::endl;
-
-        out = part1 * pow(part2, nu) * R::bessel_k(dist, nu, 1);
+        // Rcpp::Rcout << "part2: " << part2 << ", nu: " << nu << std::endl;
+        // Rcpp::Rcout << part2;
+        // Rcpp::Rcout << R::bessel_k(part2, nu, 1);
+        out = log(part1) + nu*log(part2) + log(R::bessel_k(part2, nu, 1));
     }
 
-    Rcpp::Rcout << "Matern covariance computed: " << out << std::endl;
-    return out;
+    // Rcpp::Rcout << "Matern covariance computed: " << out << std::endl;
+    return exp(out);
 }
 
+// [[Rcpp::export]]
 // Compute covariance matrix K
 arma::mat cov_mat(arma::mat locations, double phi, double nu) {
     int n = locations.n_rows;
     arma::mat K(n, n);
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
-            double dist = fabs(locations(i, 0) - locations(j, 0));
+            double dist = sqrt( pow(locations(i, 0) - locations(j, 0), 2) + pow(locations(i, 1) - locations(j, 1), 2));
+            // Rcpp::Rcout << dist;
             K(i, j) = matern(dist, phi, nu);
         }
     }
 
-    Rcpp::Rcout << "Covariance matrix K computed." << K << std::endl;
+    // Rcpp::Rcout << "Covariance matrix K computed." << K << std::endl;
 
     return K;
 }
@@ -58,7 +62,9 @@ double log_likelihood(double phi, double nu, arma::vec Y, arma::mat locations) {
     // Calculate the inverse of D
     arma::mat S_inv = arma::diagmat(1 / s);
 
-    
+    // arma::mat inv = V * S_inv * U.t();
+    // arma::mat tempp = inv * K;
+    // Rcpp::Rcout << tempp;
 
     //// Compute log-likelihood
     //arma::vec Y_trans = U.t() * Y;
@@ -68,12 +74,12 @@ double log_likelihood(double phi, double nu, arma::vec Y, arma::mat locations) {
     // Compute log-likelihood
     // arma::vec Y_trans = U.t() * Y;
   
-    double loglik = -0.5 * (arma::sum(arma::log(s)) + arma::as_scalar(Y.t() * (V.t() * S_inv * U * Y)));
+    double loglik = -0.5 * (arma::sum(arma::log(s)) + arma::as_scalar(Y.t() * (V * S_inv * U.t() * Y)));
 
     //// Compute log-likelihood
     //double loglik = -0.5 * (arma::sum(arma::log(s)) + arma::as_scalar(Y.t() * (V * arma::diagmat(1 / s) * U.t() * Y)));
 
-    Rcpp::Rcout << "Log likelihood computed." << loglik << std::endl;
+  // Rcpp::Rcout << "Log likelihood computed." << loglik << std::endl;
 
     return loglik;
 }
@@ -93,11 +99,10 @@ double log_target_posterior(double phi, double nu, arma::vec Y, arma::mat locati
     double log_likelihood_val = log_likelihood(phi, nu, Y, locations);
 
     double out = log_likelihood_val + phi_prior(phi);
-    Rcpp::Rcout << "Log target posterior computed." << out << std::endl;
+    // Rcpp::Rcout << "Log target posterior computed." << out << std::endl;
     return out;
 }
 
-// Metropolis-Hastings algorithm to sample phi
 // [[Rcpp::export]]
 arma::vec metropolis_hastings(double init_phi,
     double nu,
@@ -115,16 +120,20 @@ arma::vec metropolis_hastings(double init_phi,
     for (int iter = 1; iter < niters; ++iter) {
         // Generate proposal
         double proposal_phi = phi_chain[iter - 1] + errors[iter];
-
-        double log_acc = log_target_posterior(proposal_phi, nu, Y, locations) -
+        if(proposal_phi < 0)
+        {
+          phi_chain[iter] = phi_chain[iter - 1];
+        } else{
+          double log_acc = log_target_posterior(proposal_phi, nu, Y, locations) -
             log_target_posterior(phi_chain[iter - 1], nu, Y, locations);
-
-        if (log(R::runif(0, 1)) < log_acc) {
+          
+          if (log(R::runif(0, 1)) < log_acc) {
             phi_chain[iter] = proposal_phi;
             accept_count++;
-        }
-        else {
+          }
+          else {
             phi_chain[iter] = phi_chain[iter - 1];
+          }
         }
 
         // Progress update
