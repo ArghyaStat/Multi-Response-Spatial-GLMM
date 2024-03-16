@@ -2,7 +2,6 @@ library(fields)
 library(plot3D)
 library(geoR)
 
-
 N <- 2e2 # No. of spatial locations 
 
 locations <- matrix(0, nrow = N, ncol = 2)
