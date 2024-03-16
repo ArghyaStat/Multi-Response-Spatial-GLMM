@@ -20,11 +20,7 @@ d <- rdist(locations) # Calculates the Euclidean distance matrix
 cov <- true_sigmasq * exp(-d/true_phi) # Calculates the correlation matrix
 Y <- c(t(chol(cov)) %*% rnorm(N)) # Draws a sample from multivariate normal
 
-
-
 # MCMC Set up
-
-
 # Log-likelihood function for Gaussian Process regression using Cholesky decomposition
 
 log_likelihood <- function(theta_list, Y) {
@@ -80,9 +76,7 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
    # print(paste("Initialization Parameter:", j, "Initial value:", theta_chain[[j]][1]))
     
   }
-  
-  
-  
+ 
   # Run Metropolis-Hastings
   for (iter in 2:niters) {
     
@@ -140,7 +134,7 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
 
 
 # Sample initial parameters
-theta_init <- list(sigma_sq = 6, phi = 0.2)  # Ensure the correct order and naming
+theta_init <- list(sigma_sq = 12, phi = 0.5)  # Ensure the correct order and naming
 
 # Number of iterations
 niters <- 10000
