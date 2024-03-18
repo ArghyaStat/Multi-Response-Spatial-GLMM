@@ -1,6 +1,7 @@
 library(fields)
 library(plot3D)
 library(geoR)
+library(invgamma)
 
 N <- 2e2 # No. of spatial locations 
 
@@ -50,11 +51,19 @@ log_posterior_theta <- function(theta_list, Y){
   sigma_sq <- theta_list[[1]]
   phi <- theta_list[[2]]
   
-  return(log_likelihood(theta_list, Y) + 
-           dgamma(1/sigma_sq, shape = 0.01, rate = 0.01, log =TRUE) + 
-           dunif(phi, 0, 1, log =TRUE))
-}
+  if(phi > 0 && sigma_sq > 0){
+    
+  prior_sigma_sq <- dinvgamma(sigma_sq, shape = 0.01, rate = 0.01, log =TRUE)
+  prior_phi <- dunif(phi, 0, 1, log =TRUE)
 
+  return(log_likelihood(theta_list, Y) +
+           prior_sigma_sq +
+           prior_phi)
+    
+  }else{
+    return(-Inf)
+  }
+}
 
 # Metropolis-Hastings algorithm for component-wise sampling
 
@@ -64,7 +73,7 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
   theta_chain <- vector("list", length = n_params)
   error_list <- lapply(proposal_sd, function(h) rnorm(niters, 0, h))
   
-  accept <- 0
+  accept <- numeric(n_params)
   
   # Initialize chain
   for (j in 1:n_params) {
@@ -80,16 +89,14 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
   for (iter in 2:niters) {
     
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
-    
-    for (j in 1:n_params) {
-      
-      # At this level current takes the theta_chain at (iter-1)
+
+    # At this level current takes the theta_chain at (iter-1)
       current <- lapply(theta_chain, function(x) x[iter - 1])
-    
+                        
+    for (j in 1:n_params) {
       
       # Propose a new value for parameter j
       proposed_theta <- theta_chain[[j]][iter - 1] + error_list[[j]][iter]
-      
       
       # Just update 'only" the jth component of theta_chain
       
@@ -97,23 +104,21 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
       
       # Compute log posterior for the proposed value
       
-      
       log.r <- log_posterior_theta(current, Y) - 
                log_posterior_theta(lapply(theta_chain, function(x) x[iter - 1]), 
                                    Y)
       
       # Print diagnostic information
-     # print(paste("Iteration:", iter, "Parameter:", j, "Proposed theta:", proposed_theta, "Log-ratio:", log.r))
+     # print(paste("Iter:", iter, "Par:", j, "Prop theta:", proposed_theta, "Log-r:", log.r))
       
       # Accept or reject
       if (log(runif(1)) < log.r) {
-        
-        
+  
       # suspected wrong step  
        theta_chain[[j]][iter] <- current[[j]]
        
        # accept overcounts
-       accept <- accept + 1
+       accept[j] <- accept[j] + 1
         
       } else {
         
@@ -133,7 +138,7 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd) {
 
 
 # Sample initial parameters
-theta_init <- list(sigma_sq = 12, phi = 0.5)  # Ensure the correct order and naming
+theta_init <- list(sigma_sq = 10, phi = 0.5)  # Ensure the correct order and naming
 
 # Number of iterations
 niters <- 10000
