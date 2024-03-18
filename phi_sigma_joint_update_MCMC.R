@@ -1,6 +1,7 @@
 library(fields)
 library(plot3D)
 library(geoR)
+library(invgamma)
 
 
 N <- 2e2 # No. of spatial locations 
@@ -47,23 +48,28 @@ log_likelihood <- function(theta_vec, Y) {
 
 
 
+# Target with U(0,1) prior on phi and IG(0.01, 0.01) on sigma_sq
+
 log_posterior_theta <- function(theta_vec, Y){
   
   sigma_sq <- theta_vec[1]
   phi <- theta_vec[2]
-
-  # Target with U(0,1) prior on phi and IG(0.01, 0.01) on sigma_sq
   
-  prior_sigma_sq <- dgamma(1/sigma_sq, shape = 0.01, rate = 0.01, log =TRUE)
-  prior_phi <- dunif(phi, 0, 1, log =TRUE))
+  if(phi > 0 && sigma_sq > 0){
+    
+    prior_sigma_sq <- dinvgamma(sigma_sq, shape = 0.01, rate = 0.01, log =TRUE)
+    prior_phi <-  dunif(phi, 0, 1, log =TRUE)
+    
+    return(log_likelihood(theta_vec, Y) + 
+             prior_sigma_sq + 
+             prior_phi)
+  }else{
+    return(-Inf)
+  }
   
-  return(log_likelihood(theta_vec, Y) + 
-           prior_sigma_sq + 
-           prior_phi)
 }
 
 
-# Metropolis-Hastings algorithm for joint sampling
 # Metropolis-Hastings algorithm for joint sampling
 metropolis_hastings <- function(theta_init, niters, proposal_sd, post_cov) {
   
@@ -82,8 +88,10 @@ metropolis_hastings <- function(theta_init, niters, proposal_sd, post_cov) {
   
   for (i in 2:niters) {
     
+    
     if(i %% ((niters)/10) == 0) print(paste0(100*(i/(niters)), "%"))
-
+    
+      
       # Propose new value for the parameter
       proposal_theta <- theta_chain[i-1,] + error_mat[i,]
       
@@ -121,6 +129,10 @@ niters <- 1e4
 
 # Standard deviation vector for proposal distribution
 proposal_sd <- c(0.5, 0.08)
+
+# If the one don't want to implement RWMH independent across components
+post_cov <- diag(2)
+#post_cov <- matrix(c(1, 0.9, 0.9, 1), nrow = 2, byrow = TRUE)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(theta_init = theta_init, niters = niters, proposal_sd = proposal_sd)
