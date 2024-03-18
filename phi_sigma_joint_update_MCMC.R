@@ -59,7 +59,7 @@ log_posterior_theta <- function(theta_vec, Y){
   
   return(log_likelihood(theta_vec, Y) + 
            prior_sigma_sq + 
-           prior_phi
+           prior_phi)
 }
 
 
