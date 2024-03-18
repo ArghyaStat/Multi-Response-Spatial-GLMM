@@ -64,37 +64,47 @@ log_posterior_theta <- function(theta_vec, Y){
 
 
 # Metropolis-Hastings algorithm for joint sampling
-metropolis_hastings <- function(theta_init, niters, proposal_sd) {
+# Metropolis-Hastings algorithm for joint sampling
+metropolis_hastings <- function(theta_init, niters, proposal_sd, post_cov) {
   
   n_params <- length(theta_init)
-  theta_chain <- array(dim = c(niters, n_params))
+  theta_chain <- array(dim = c(niters, 2))
   
-  error_mat <- cbind(rnorm(niters, 0, proposal_sd[1]), rnorm(niters, 0, proposal_sd[2]))
+  proposal_cov <- diag(proposal_sd)%*%post_cov%*%diag(proposal_sd)
+  
+  
+  error_mat <- t(chol(proposal_cov) %*% matrix(rnorm(niters * n_params), nrow = n_params))
+    
+  # error_mat <- cbind(rnorm(niters, 0, proposal_sd[1]), rnorm(niters, 0, proposal_sd[2]))
   accept <- 0
   
   theta_chain[1,] <- theta_init
   
   for (i in 2:niters) {
-  
+    
     if(i %% ((niters)/10) == 0) print(paste0(100*(i/(niters)), "%"))
-    
-    # Propose new value for the parameter
-    proposal_theta <- theta_chain[i-1,] + error_mat[i,]
-    
-    log.r <- log_posterior_theta(proposal_theta, Y) - 
-      log_posterior_theta(theta_chain[i-1,] , Y)
-    
-    # Accept or reject
-    if (log(runif(1)) < log.r) {
+
+      # Propose new value for the parameter
+      proposal_theta <- theta_chain[i-1,] + error_mat[i,]
       
-      theta_chain[i,] <- proposal_theta
+      log.r <- log_posterior_theta(proposal_theta, Y) - 
+               log_posterior_theta(theta_chain[i-1,] , Y)
       
-      # accept counter
-      accept <- accept + 1
-      
-    } else {     
-      theta_chain[i,] <- theta_chain[i-1,]     
-    }
+      # Accept or reject
+      if (log(runif(1)) < log.r) {
+        
+        
+        # suspected wrong step  
+        theta_chain[i,] <- proposal_theta
+        
+        # accept counter
+        accept <- accept + 1
+        
+      } else {
+        
+        theta_chain[i,] <- theta_chain[i-1,]
+        
+      }
   }
   
   # Calculate acceptance rate 
