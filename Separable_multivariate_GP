@@ -1,0 +1,302 @@
+
+library(fields)
+library(ggplot2)
+library(viridis)
+library(plot3D)
+library(fBasics)  # For vectorize columns of a matrix
+library(MCMCpack)
+library(mvtnorm)
+
+set.seed(3019)
+
+# dimension of the random field
+q <- 3
+  
+#as.integer(readline(prompt="Enter the dimension of the random field (q): "))
+
+N <- 2e2 # No. of spatial locations
+
+
+#simulating N locations over [0,1]^2 in locations matrix
+
+locations <- matrix(0, nrow = N, ncol = 2)
+
+locations[, 1] <- runif(N)
+locations[, 2] <- runif(N)
+
+
+# Adding a mean term
+
+X = cbind(1, locations)
+
+#design matrix in concatenated form of dim (Np * 1) 
+X_vec <- vec(t(X))  
+
+
+#Number of features in the spatial model
+p <- ncol(cbind(1, locations))
+
+
+# True value of regression matrix beta
+true_beta <- matrix(rnorm(p * q, mean = 0, sd = 16), nrow = p, ncol = q)  
+
+#beta_mat is the kronecker product of the coefficient matrix across locations
+
+beta_mat <- diag(N) %x% true_beta  
+
+# Fixed effect (I_n * B^T) X
+mu_vec <- c(beta_mat %*% X_vec)  
+
+
+# True value of componentwise var-cov matrix
+true_Sigma_mat <- matrix(runif(q^2, 0.5, 3), nrow = q) # Random symmetric positive definite matrix
+true_Sigma_mat <- sqrt(true_Sigma_mat %*% t(true_Sigma_mat))  # Ensuring positive definiteness
+
+#true_Sigma_mat <- matrix(c(2,1,1,1,2,1,1,1,2), nrow = q, ncol =q, byrow = TRUE)
+
+# true_phi
+
+true_phi <- 0.2
+
+# true_nu
+
+true_nu <- 0.5
+
+#true_tausq <- runif(q, 0.1, 0.3)
+true_Psi <- diag(runif(q, 0.1, 0.3), q)
+
+# Calculates the Euclidean distance matrix
+
+distmat <- rdist(locations) 
+
+# Calculates the correlation matrix from matern kernel
+
+K <- Matern(distmat, range = true_phi, smoothness = true_nu)
+
+# Calculates the separable covariance matrix with nugget effect
+
+Omega <- K %x% true_Sigma_mat + diag(N) %x% true_Psi
+
+# Generating the response vector of dimension Nq*1
+
+Y_vec <- mu_vec + c(t(chol(Omega)) %*% rnorm(N*q))
+
+# Saving necessary parameters and data
+save(N, locations, X, p, q, true_beta, true_tausq,
+     true_Sigma_mat, true_phi, true_nu, Y_vec, file = "separable_mgp_data.Rdata") 
+
+
+# MCMC Set up
+# Log-likelihood function for Gaussian Process regression using Cholesky decomposition
+
+log_likelihood <- function(theta_list, Y_vec, locations) {
+  
+  beta <- theta_list[[1]]
+  Sigma <- theta_list[[2]]
+  Psi <- theta_list[[3]]
+  phi <- theta_list[[4]]
+  nu <- theta_list[[5]]
+  
+  N <- nrow(locations)
+  
+  X = cbind(1, locations)
+  
+  #design matrix in concatenated form of dim (Np * 1) 
+  X_vec <- vec(t(X))  
+  
+  distmat <- rdist(locations) 
+  
+  if(phi > 0 &  nu > 0){
+    
+    K <- Matern(distmat, range = phi, smoothness = nu) 
+    chol.K <- chol(K)
+    prec.K <- chol2inv(chol.K)
+    
+    Sigma_tilde <- Sigma + Psi
+    chol.Sigma_tilde <- chol(Sigma_tilde)
+    prec.Sigma_tilde <- chol2inv(chol.Sigma_tilde)
+    
+    prec <- prec.K %x% prec.Sigma_tilde
+    
+    # Calculates the separable covariance matrix with nugget effect
+    
+    resid <- Y_vec - (diag(N) %x% beta) %*% X_vec
+   
+    like.out <- - q*sum(log(diag(chol.K))) - N*sum(log(diag(chol.Sigma_tilde))) 
+                - 0.5*sum((prec %*% resid) * resid)
+      
+  }else{
+    
+    like.out <- -Inf
+  }
+  
+  return(like.out)
+}
+
+# log-posterior of the model parameters
+
+log_posterior_theta <- function(theta_list, Y_vec, locations){
+  
+  beta <- theta_list[[1]]
+  Sigma <- theta_list[[2]]
+  Psi <- theta_list[[3]]
+  phi <- theta_list[[4]]
+  nu <- theta_list[[5]]
+  
+  if(phi > 0 && nu > 0){
+  #& tausq > rep(0,q) 
+   
+  
+    prior_phi <- dunif(phi, 0, 1, log = TRUE)
+    prior_nu <- dlnorm(nu, meanlog = -1.2, sdlog = 1, log = TRUE)
+    prior_Sigma <- log(diwish(Sigma, v =  q + 1, S = 100*diag(q)))
+    prior_beta <- dmvnorm(as.vector(vec(t(beta))), mean = rep(0, p*q), sigma = 100*diag(p*q), log = TRUE)
+    prior_Psi <- log(diwish(Psi, v =  q + 1, S = 80*diag(q)))
+    
+    return(log_likelihood(theta_list, Y_vec, locations) +
+             prior_beta +
+             prior_Sigma +
+             prior_Psi +
+             prior_phi +
+             prior_nu)
+    
+  }else{
+    return(-Inf)
+  }
+}
+
+# List of proposal samples for different parameters
+proposal_list <- function(param_name, current_state, tuning_params) {
+  
+  # Extract current values from current state
+  current_beta <- current_state$beta
+  current_Sigma <- current_state$Sigma
+  current_Psi <- current_state$Psi
+  current_phi <- current_state$phi
+  current_nu <- current_state$nu
+  
+  # Initialize proposal parameter with current value
+  proposal_parameter <- NULL
+  
+  # Draw proposal for the specified parameter
+  if (param_name == "beta") {
+    proposal_parameter <- current_beta + sqrt(tuning_params[[param_name]])* rnorm(p*q, 0, 1)
+    dim(proposal_parameter) = c(p, q)
+  } else if (param_name == "Sigma") {
+    proposal_parameter <- riwish(v = q + 2, current_Sigma)
+  } else if (param_name == "Psi") {
+    proposal_parameter <- riwish(v = q + 2, current_Psi)
+  } else if (param_name == "phi") {
+    proposal_parameter <- current_phi + rnorm(1,  0, tuning_params[[param_name]])
+  } else if (param_name == "nu") {
+    proposal_parameter <- current_nu + rnorm(1,  0, tuning_params[[param_name]])
+  } else {
+    stop("Invalid parameter name!")
+  }
+  
+  return(proposal_parameter)
+}
+
+# Metropolis-Hastings algorithm for component-wise sampling
+
+metropolis_hastings <- function(theta_init, niters, tuning_params) {
+  
+  n_params <- length(theta_init)
+  theta_chain <- vector("list", length = n_params)
+  theta_chain <- list("beta" = matrix(0, niters*p, q), 
+                      "Sigma" = matrix(matrix(0, niters*q, q)),
+                      "Psi" = matrix(0, niters*q, q),
+                      "phi" = numeric(niters),
+                      "nu" = numeric(niters))
+  
+  accept <- numeric(n_params)
+  
+  # Initialize chain
+  for (param_name in names(theta_init)) {
+    
+    
+    theta_chain[[param_name]][1] <- theta_init[[param_name]]
+    
+    # print(paste("Initialization Parameter:", j, "Initial value:", theta_chain[[j]][1])) 
+    
+  }
+  
+  # Run Metropolis-Hastings
+  for (iter in 2:niters) {
+    
+    if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
+    
+    # At this level current takes the theta_chain at (iter-1)
+    current <- lapply(theta_chain, function(x) x[iter - 1])
+ 
+    
+    # Loop over parameters
+    for (param_name in names(theta_init)) {
+      
+      # Draw proposal for current parameter
+      proposed_theta <- proposal_list(param_name, current_state = current, 
+                                      tuning_params = tuning_params)
+      
+      # Just update 'only" the jth component of theta_chain
+      
+      current[[param_name]] <- proposed_theta
+    }
+    
+
+    
+    # Compute log posterior for the proposed value
+    
+    log.r <- log_posterior_theta(current, Y_vec, locations = locations) - 
+             log_posterior_theta(lapply(theta_chain, function(x) x[iter - 1]), 
+                          Y_vec, locations = locations)
+    
+    # Print diagnostic information
+    # print(paste("Iter:", iter, "Par:", j, "Prop theta:", proposed_theta, "Log-r:", log.r))
+    
+    # Accept or reject
+    if (log(runif(1)) < log.r) {
+      
+      # suspected wrong step  
+      theta_chain[[param_name]][iter] <- current[[param_name]]
+      
+      # accept overcounts
+      accept[param_name] <- accept[param_name] + 1
+      
+    } else {
+      
+      theta_chain[[param_name]][iter] <- theta_chain[[param_name]][iter - 1]
+      
+    }
+  }
+    
+
+# Print theta_chain values for each iteration
+#print(paste("Theta_chain at iteration", iter, ":", theta_chain))
+
+
+# Calculate acceptance rate which is > 1 wrong.
+print(paste("Acceptance = ", accept/niters))
+
+return(theta_chain)
+
+}
+
+# Sample initial parameters
+theta_init <- list("beta" = matrix(rep(0, p*q), nrow = p, ncol = q),
+                   "Sigma" = diag(q),
+                   "Psi" = diag(q),
+                   "phi" = 0.5,
+                   "nu" = 1)
+
+# Number of iterations
+niters <- 1e2
+
+# Tuning parameters list
+
+tuning_params <- list("beta" = 0.1,
+                     "phi" = 0.05,
+                     "nu" = 0.05)
+
+# Run Metropolis-Hastings algorithm
+theta_chain <- metropolis_hastings(theta_init = theta_init, niters = niters, 
+                                   tuning_params = tuning_params)
