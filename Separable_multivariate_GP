@@ -12,7 +12,7 @@ set.seed(3019)
 
 # dimension of the random field
 q <- 3
-  
+
 #as.integer(readline(prompt="Enter the dimension of the random field (q): "))
 
 N <- 2e2 # No. of spatial locations
@@ -35,25 +35,29 @@ X_vec <- vec(t(X))
 
 
 #Number of features in the spatial model
-p <- ncol(cbind(1, locations))
+p <- ncol(X)
 
 
 # True value of regression matrix beta
-true_beta <- matrix(rnorm(p * q, mean = 0, sd = 16), nrow = p, ncol = q)  
+true_beta <- matrix(c(-1.25, 2, 0.8, 0.35, -1.72, 2.5, 2.12, 0.45, -2.32), 
+                    nrow = 3, byrow = TRUE)
+  
+  
+#matrix(rnorm(p * q, mean = 0, sd = 2), nrow = p, ncol = q)  
 
 #beta_mat is the kronecker product of the coefficient matrix across locations
 
-beta_mat <- diag(N) %x% true_beta  
+beta_mat <- diag(N) %x% t(true_beta) 
 
 # Fixed effect (I_n * B^T) X
 mu_vec <- c(beta_mat %*% X_vec)  
 
 
 # True value of componentwise var-cov matrix
-true_Sigma_mat <- matrix(runif(q^2, 0.5, 3), nrow = q) # Random symmetric positive definite matrix
-true_Sigma_mat <- sqrt(true_Sigma_mat %*% t(true_Sigma_mat))  # Ensuring positive definiteness
+#true_Sigma <- matrix(runif(q^2, 0.5, 3), nrow = q) # Random symmetric positive definite matrix
+#true_Sigma <- sqrt(true_Sigma %*% t(true_Sigma))  # Ensuring positive definiteness
 
-#true_Sigma_mat <- matrix(c(2,1,1,1,2,1,1,1,2), nrow = q, ncol =q, byrow = TRUE)
+true_Sigma <- matrix(c(2,1,1,1,2,1,1,1,2), nrow = q, ncol =q, byrow = TRUE)
 
 # true_phi
 
@@ -63,8 +67,9 @@ true_phi <- 0.2
 
 true_nu <- 0.5
 
-#true_tausq <- runif(q, 0.1, 0.3)
-true_Psi <- diag(runif(q, 0.1, 0.3), q)
+#true_r
+
+true_r <- 0.8
 
 # Calculates the Euclidean distance matrix
 
@@ -76,15 +81,15 @@ K <- Matern(distmat, range = true_phi, smoothness = true_nu)
 
 # Calculates the separable covariance matrix with nugget effect
 
-Omega <- K %x% true_Sigma_mat + diag(N) %x% true_Psi
+Omega <- (true_r*K  + (1-true_r)*diag(N)) %x% true_Sigma
 
 # Generating the response vector of dimension Nq*1
 
 Y_vec <- mu_vec + c(t(chol(Omega)) %*% rnorm(N*q))
 
 # Saving necessary parameters and data
-save(N, locations, X, p, q, true_beta, true_tausq,
-     true_Sigma_mat, true_phi, true_nu, Y_vec, file = "separable_mgp_data.Rdata") 
+save(N,  p, q, locations, X, Y_vec, true_beta, 
+     true_Sigma, true_phi, true_nu, true_r, file = "separable_mgp_data.Rdata") 
 
 
 # MCMC Set up
@@ -94,38 +99,42 @@ log_likelihood <- function(theta_list, Y_vec, locations) {
   
   beta <- theta_list[[1]]
   Sigma <- theta_list[[2]]
-  Psi <- theta_list[[3]]
-  phi <- theta_list[[4]]
-  nu <- theta_list[[5]]
+  phi <- theta_list[[3]]
+  nu <- theta_list[[4]]
+  r <- theta_list[[5]]
   
   N <- nrow(locations)
   
   X = cbind(1, locations)
+  
+  p <- ncol(X)
   
   #design matrix in concatenated form of dim (Np * 1) 
   X_vec <- vec(t(X))  
   
   distmat <- rdist(locations) 
   
-  if(phi > 0 &  nu > 0){
+  if(phi > 0 & nu > 0 & r > 0 & r < 1){
     
-    K <- Matern(distmat, range = phi, smoothness = nu) 
-    chol.K <- chol(K)
-    prec.K <- chol2inv(chol.K)
+    K.tilde <- r*Matern(distmat, range = phi, smoothness = nu) + (1- r)*diag(N)
     
-    Sigma_tilde <- Sigma + Psi
-    chol.Sigma_tilde <- chol(Sigma_tilde)
-    prec.Sigma_tilde <- chol2inv(chol.Sigma_tilde)
+    chol.K.tilde <- chol(K.tilde)
+    prec.K.tilde <- chol2inv(chol.K.tilde)
     
-    prec <- prec.K %x% prec.Sigma_tilde
+    q <- ncol(Sigma)
+    
+    chol.Sigma <- chol(Sigma)
+    prec.Sigma <- chol2inv(chol.Sigma)
+    
+    prec <- prec.K.tilde %x% prec.Sigma
     
     # Calculates the separable covariance matrix with nugget effect
     
-    resid <- Y_vec - (diag(N) %x% beta) %*% X_vec
-   
-    like.out <- - q*sum(log(diag(chol.K))) - N*sum(log(diag(chol.Sigma_tilde))) 
-                - 0.5*sum((prec %*% resid) * resid)
-      
+    resid <- Y_vec - (diag(N) %x% t(beta)) %*% X_vec
+    
+    like.out <- - q*sum(log(diag(chol.K.tilde))) - N*sum(log(diag(chol.Sigma))) 
+    - 0.5*sum((prec %*% resid) * resid)
+    
   }else{
     
     like.out <- -Inf
@@ -140,83 +149,63 @@ log_posterior_theta <- function(theta_list, Y_vec, locations){
   
   beta <- theta_list[[1]]
   Sigma <- theta_list[[2]]
-  Psi <- theta_list[[3]]
-  phi <- theta_list[[4]]
-  nu <- theta_list[[5]]
+  phi <- theta_list[[3]]
+  nu <- theta_list[[4]]
+  r <- theta_list[[5]]
   
-  if(phi > 0 && nu > 0){
-  #& tausq > rep(0,q) 
-   
-  
+  if(phi > 0 & nu > 0 & r > 0 & r < 1){
+    
+    #prior_specifications
+    
     prior_phi <- dunif(phi, 0, 1, log = TRUE)
     prior_nu <- dlnorm(nu, meanlog = -1.2, sdlog = 1, log = TRUE)
     prior_Sigma <- log(diwish(Sigma, v =  q + 1, S = 100*diag(q)))
-    prior_beta <- dmvnorm(as.vector(vec(t(beta))), mean = rep(0, p*q), sigma = 100*diag(p*q), log = TRUE)
-    prior_Psi <- log(diwish(Psi, v =  q + 1, S = 80*diag(q)))
+    prior_beta <- dmvnorm(as.vector(vec(t(beta))), mean = rep(0, p*q), 
+                          sigma = 100*diag(p*q), log = TRUE)
+    prior_r <- dunif(r, 0, 1, log = TRUE)
     
     return(log_likelihood(theta_list, Y_vec, locations) +
              prior_beta +
              prior_Sigma +
-             prior_Psi +
              prior_phi +
-             prior_nu)
+             prior_nu +
+             prior_r)
     
   }else{
     return(-Inf)
   }
 }
 
-# List of proposal samples for different parameters
-proposal_list <- function(param_name, current_state, tuning_params) {
-  
-  # Extract current values from current state
-  current_beta <- current_state$beta
-  current_Sigma <- current_state$Sigma
-  current_Psi <- current_state$Psi
-  current_phi <- current_state$phi
-  current_nu <- current_state$nu
-  
-  # Initialize proposal parameter with current value
-  proposal_parameter <- NULL
-  
-  # Draw proposal for the specified parameter
-  if (param_name == "beta") {
-    proposal_parameter <- current_beta + sqrt(tuning_params[[param_name]])* rnorm(p*q, 0, 1)
-    dim(proposal_parameter) = c(p, q)
-  } else if (param_name == "Sigma") {
-    proposal_parameter <- riwish(v = q + 2, current_Sigma)
-  } else if (param_name == "Psi") {
-    proposal_parameter <- riwish(v = q + 2, current_Psi)
-  } else if (param_name == "phi") {
-    proposal_parameter <- current_phi + rnorm(1,  0, tuning_params[[param_name]])
-  } else if (param_name == "nu") {
-    proposal_parameter <- current_nu + rnorm(1,  0, tuning_params[[param_name]])
-  } else {
-    stop("Invalid parameter name!")
-  }
-  
-  return(proposal_parameter)
-}
-
-# Metropolis-Hastings algorithm for component-wise sampling
 
 metropolis_hastings <- function(theta_init, niters, tuning_params) {
   
+  
   n_params <- length(theta_init)
   theta_chain <- vector("list", length = n_params)
-  theta_chain <- list("beta" = matrix(0, niters*p, q), 
-                      "Sigma" = matrix(matrix(0, niters*q, q)),
-                      "Psi" = matrix(0, niters*q, q),
-                      "phi" = numeric(niters),
-                      "nu" = numeric(niters))
+  
+  for (iter in 1:niters){
+    theta_chain[[1]][[iter]] <- matrix(0, nrow = p, ncol = q)
+    theta_chain[[2]][[iter]] <- matrix(0, nrow = q, ncol = q)
+    theta_chain[[3]][[iter]] <- 0
+    theta_chain[[4]][[iter]] <- 0
+    theta_chain[[5]][[iter]] <- 0
+    
+  }
+  
+  
+  error_beta <- sqrt(tuning_params[1]) * rnorm(niters*p*q, 0, 1)
+  error_phi <- rnorm(niters, 0, tuning_params[3])
+  error_nu <- rnorm(niters, 0, tuning_params[4])
+  error_r <- rnorm(niters, 0, tuning_params[5])
+  
   
   accept <- numeric(n_params)
   
   # Initialize chain
-  for (param_name in names(theta_init)) {
+  for (j in 1:n_params) {
     
     
-    theta_chain[[param_name]][1] <- theta_init[[param_name]]
+    theta_chain[[j]][[1]] <- theta_init[[j]]
     
     # print(paste("Initialization Parameter:", j, "Initial value:", theta_chain[[j]][1])) 
     
@@ -228,75 +217,172 @@ metropolis_hastings <- function(theta_init, niters, tuning_params) {
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
     
     # At this level current takes the theta_chain at (iter-1)
-    current <- lapply(theta_chain, function(x) x[iter - 1])
- 
+    current <- lapply(theta_chain, function(x) x[[iter - 1]])
     
-    # Loop over parameters
-    for (param_name in names(theta_init)) {
-      
-      # Draw proposal for current parameter
-      proposed_theta <- proposal_list(param_name, current_state = current, 
-                                      tuning_params = tuning_params)
-      
-      # Just update 'only" the jth component of theta_chain
-      
-      current[[param_name]] <- proposed_theta
-    }
     
-
+    ############ Updating beta
+    
+    proposed_beta <- vec(theta_chain[[1]][[iter - 1]]) + error_beta[((iter-2)*p*q +1): ((iter-1)*p*q)]
+    
+    current[[1]] <- proposed_beta
+    dim(current[[1]]) = c(p, q)
     
     # Compute log posterior for the proposed value
     
-    log.r <- log_posterior_theta(current, Y_vec, locations = locations) - 
-             log_posterior_theta(lapply(theta_chain, function(x) x[iter - 1]), 
-                          Y_vec, locations = locations)
-    
-    # Print diagnostic information
-    # print(paste("Iter:", iter, "Par:", j, "Prop theta:", proposed_theta, "Log-r:", log.r))
+    log.r.beta <- log_posterior_theta(current, Y_vec, locations) - 
+                  log_posterior_theta(lapply(theta_chain, 
+                                      function(x) x[[iter - 1]]), Y_vec, locations)
     
     # Accept or reject
-    if (log(runif(1)) < log.r) {
+    if (log(runif(1)) < log.r.beta) {
       
       # suspected wrong step  
-      theta_chain[[param_name]][iter] <- current[[param_name]]
+      theta_chain[[1]][[iter]] <- current[[1]]
       
       # accept overcounts
-      accept[param_name] <- accept[param_name] + 1
+      accept[1] <- accept[1] + 1
       
     } else {
       
-      theta_chain[[param_name]][iter] <- theta_chain[[param_name]][iter - 1]
+      theta_chain[[1]][[iter]] <- theta_chain[[1]][[iter - 1]]
       
     }
-  }
+  
+  ########### Updating Sigma
+  
+  proposed_Sigma <- riwish(v = q + 1 + tuning_params[2], 
+                           tuning_params[2]*theta_chain[[2]][[iter - 1]]) 
+  
+  current[[2]] <- proposed_Sigma 
+  
+  # Compute log posterior for the proposed value of Sigma
+  
+  log.r.Sigma <- log_posterior_theta(current, Y_vec, locations) - 
+                 log_posterior_theta(lapply(theta_chain, 
+                                           function(x) x[[iter - 1]]), 
+                                           Y_vec, locations) -
+                 log(diwish(W = current[[2]], 
+                           v = q + 1 + tuning_params[2], 
+                           S = tuning_params[2]* theta_chain[[2]][[iter-1]])) +
+                 log(diwish(W = theta_chain[[2]][[iter-1]],
+                           v = q + 1 + tuning_params[2],
+                           S = tuning_params[2] * current[[2]]))
+  
+  # Accept or reject
+  if (log(runif(1)) < log.r.Sigma) {
     
+    # suspected wrong step  
+    theta_chain[[2]][[iter]] <- current[[2]]
+    
+    # accept overcounts
+    accept[2] <- accept[2] + 1
+    
+  } else {
+    
+    theta_chain[[2]][[iter]] <- theta_chain[[2]][[iter - 1]]
+    
+  }
+  
+  
+  ####### Updating phi
+  proposed_phi <- theta_chain[[3]][[iter - 1]] + error_phi[iter]
+  
+  current[[3]] <- proposed_phi
+  
+  # Compute log posterior for the proposed value
+  
+  log.r.phi <- log_posterior_theta(current, Y_vec, locations) - 
+                log_posterior_theta(lapply(theta_chain, 
+                               function(x) x[[iter - 1]]), Y_vec, locations)
+  
+  # Accept or reject
+  if (log(runif(1)) < log.r.phi) {
+    
+    # suspected wrong step  
+    theta_chain[[3]][[iter]] <- current[[3]]
+    
+    # accept overcounts
+    accept[3] <- accept[3] + 1
+    
+  } else {
+    
+    theta_chain[[3]][[iter]] <- theta_chain[[3]][[iter - 1]]
+    
+  }
+  
+  ####### Updating nu
+  proposed_nu <- theta_chain[[3]][[iter - 1]] + error_nu[iter]
+  
+  current[[4]] <- proposed_nu
+  
+  # Compute log posterior for the proposed value
+  
+  log.r.nu <- log_posterior_theta(current, Y_vec, locations) - 
+              log_posterior_theta(lapply(theta_chain, 
+                               function(x) x[[iter - 1]]), Y_vec, locations)
+  
+  # Accept or reject
+  if (log(runif(1)) < log.r.nu) {
+    
+    # suspected wrong step  
+    theta_chain[[4]][[iter]] <- current[[4]]
+    
+    # accept overcounts
+    accept[4] <- accept[4] + 1
+    
+  } else {
+    
+    theta_chain[[4]][[iter]] <- theta_chain[[4]][[iter - 1]]
+    
+  }
+  
+  
+  ####### Updating r
+  proposed_r <- theta_chain[[5]][[iter - 1]] + error_r[iter]
+  
+  current[[5]] <- proposed_r
+  
+  # Compute log posterior for the proposed value
+  
+  log.r.r <- log_posterior_theta(current, Y_vec, locations) - 
+             log_posterior_theta(lapply(theta_chain, 
+                               function(x) x[[iter - 1]]), Y_vec, locations)
+  
+  # Accept or reject
+  if (log(runif(1)) < log.r.r) {
+    
+    # suspected wrong step  
+    theta_chain[[5]][[iter]] <- current[[5]]
+    
+    # accept overcounts
+    accept[5] <- accept[5] + 1
+    
+  } else {
+    
+    theta_chain[[5]][[iter]] <- theta_chain[[5]][[iter - 1]]
+    
+  }
 
-# Print theta_chain values for each iteration
-#print(paste("Theta_chain at iteration", iter, ":", theta_chain))
+}
 
-
-# Calculate acceptance rate which is > 1 wrong.
 print(paste("Acceptance = ", accept/niters))
 
 return(theta_chain)
-
 }
 
 # Sample initial parameters
 theta_init <- list("beta" = matrix(rep(0, p*q), nrow = p, ncol = q),
                    "Sigma" = diag(q),
-                   "Psi" = diag(q),
                    "phi" = 0.5,
-                   "nu" = 1)
+                   "nu" = 1,
+                   "r" = 0.5)
 
 # Number of iterations
-niters <- 1e2
+niters <- 1e4
 
 # Tuning parameters list
 
-tuning_params <- list("beta" = 0.1,
-                     "phi" = 0.05,
-                     "nu" = 0.05)
+tuning_params <- c(3, 1, 0.05, 0.1, 0.02)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(theta_init = theta_init, niters = niters, 
