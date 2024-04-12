@@ -1,5 +1,10 @@
 #See overleaf documentation for model
 
+rm(list = ls())
+#
+mydir <- "C:/Users/Arghya/OneDrive - IIT Kanpur/arghya/IIT Kanpur PhD documents/Spatial and MCMC Research/Project1/Computing/Multivariate GP_ncp"
+setwd(mydir)
+
 library(fields)
 library(ggplot2)
 library(viridis)
@@ -45,10 +50,10 @@ beta_mat <- diag(N) %x% t(true_beta)
 mu_vec <- c(beta_mat %*% X_vec)
 
 # True value of componentwise var-cov matrix
-true_Sigma <- matrix(runif(q^2, 0.5, 3), nrow = q) # Random symmetric positive definite matrix
-true_Sigma <- true_Sigma %*% t(true_Sigma)  # Ensuring positive definiteness
+#true_Sigma <- matrix(runif(q^2, 0.5, 3), nrow = q) # Random symmetric positive definite matrix
+#true_Sigma <- true_Sigma %*% t(true_Sigma)  # Ensuring positive definiteness
 
-#true_Sigma_mat <- matrix(c(2,1,1,1,2,1,1,1,2), nrow = q, ncol =q, byrow = TRUE)
+true_Sigma <- matrix(c(3,2,2,4), nrow = q, ncol =q, byrow = TRUE)
 
 # true_phi
 
@@ -165,11 +170,11 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
     
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
     
-    # current_beta <- beta
-    # current_Sigma <- Sigma
-    # current_phi <- phi
-    # current_nu <- nu
-    # current_r <- r
+    current_beta <- beta
+    current_Sigma <- Sigma
+    current_phi <- phi
+    current_nu <- nu
+    current_r <- r
     
     current_beta <- rnorm(p*q, beta, sqrt(tuning_params[1]))
     dim(current_beta) = c(p,q)
@@ -181,19 +186,19 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
                                 nu,
                                 r,
                                 Y_vec, locations = locations) -
-      log_posterior(beta,
-                    Sigma,
-                    phi,
-                    nu,
-                    r,
-                    Y_vec, locations = locations)
+                  log_posterior(beta,
+                                Sigma,
+                                phi,
+                                nu,
+                                r,
+                                Y_vec, locations = locations)
     
     # Accept or reject
     if (log(runif(1)) < log.r_beta) {
       
-      # suspected wrong step
+     
       beta <- current_beta
-      # accept overcounts
+     
       accept[1] <- accept[1] + 1
       
     }
@@ -280,7 +285,8 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
       
     }
     
-    current_r <- rnorm(1, r, sqrt(tuning_params[4]))
+    current_r <- rnorm(1, r, sqrt(tuning_params[5]))
+    #current_r <- runif(1, r - 0.5*tuning_params[5], sqrt(tuning_params[4]))
     
     # Compute log posterior for the proposed value
     log.r_r <- log_posterior(beta,
@@ -289,19 +295,19 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
                              nu,
                              current_r,
                              Y_vec, locations = locations) -
-      log_posterior(beta,
-                    Sigma,
-                    phi,
-                    nu,
-                    r,
-                    Y_vec, locations = locations)
+               log_posterior(beta,
+                             Sigma,
+                             phi,
+                             nu,
+                             r,
+                             Y_vec, locations = locations)
     
     # Accept or reject
     if (log(runif(1)) < log.r_r) {
       
       r <- current_r
       # accept overcounts
-      accept[4] <- accept[4] + 1
+      accept[5] <- accept[5] + 1
       
     }
     
@@ -329,18 +335,21 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
 # Sample initial parameters
 beta <- matrix(rep(0, p*q), nrow = p, ncol = q)
 Sigma <- diag(q)
-phi <- 0.5
+phi <- 0.8
 nu <- 1
 r <- 0.5
 
 # Number of iterations
-niters <- 1e3
+niters <- 3e4
 
 # Tuning parameters list
 
-tuning_params <- c(0.01, 0.01, 0.01, 1e-2, 1e-4)
+tuning_params <- c(0.02, 2e2, 5e-4, 1.5e-2, 1.5e-2)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
                                    niters = niters,
                                    tuning_params = tuning_params)
+
+# Saving MCMC chain
+save(theta_chain, file = "separable_mgp_MCMC_chain.Rdata")
