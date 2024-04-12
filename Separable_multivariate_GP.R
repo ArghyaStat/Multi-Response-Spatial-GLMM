@@ -348,3 +348,15 @@ theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
 
 # Saving MCMC chain
 save(theta_chain, file = "separable_mgp_MCMC_chain.Rdata")
+
+# Traceplots
+
+plot.ts(theta_chain$phi_sample, ylab = "phi", main = "Traceplot of phi")
+abline(h = true_phi, col = 'blue', lwd = 2)
+
+plot.ts(theta_chain$nu_sample, ylab = "nu", main = "Traceplot of nu")
+abline(h = true_nu, col = 'blue', lwd = 2)
+
+plot.ts(theta_chain$r_sample, ylab = "r", main = "Traceplot of r")
+abline(h = true_r, col = 'blue', lwd = 2)
+
