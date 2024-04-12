@@ -1,10 +1,5 @@
 #See overleaf documentation for model
 
-rm(list = ls())
-#
-mydir <- "C:/Users/Arghya/OneDrive - IIT Kanpur/arghya/IIT Kanpur PhD documents/Spatial and MCMC Research/Project1/Computing/Multivariate GP_ncp"
-setwd(mydir)
-
 library(fields)
 library(ggplot2)
 library(viridis)
