@@ -1,4 +1,4 @@
-#See overleaf documentation for model
+# See overleaf for the analysis of the separable GP model
 
 library(fields)
 library(ggplot2)
@@ -7,6 +7,7 @@ library(plot3D)
 library(fBasics)  # For vectorize columns of a matrix
 library(MCMCpack)
 library(mvtnorm)
+library(SimTools)
 
 set.seed(3019)
 
@@ -133,7 +134,7 @@ log_posterior <- function(beta, Sigma, phi, nu, r, Y_vec, locations){
   
   prior_phi <- dunif(phi, 0, 1, log = TRUE)
   prior_nu <-  dlnorm(nu, meanlog = -1.2, sdlog = 1, log = TRUE)
-  prior_Sigma <- log(diwish(Sigma, v =  q + 2, S = 100*diag(q)))
+  prior_Sigma <- log(diwish(Sigma, v =  q + 1, S = diag(q)))
   prior_beta <- mvtnorm::dmvnorm(as.vector(vec(t(beta))), mean = rep(0, p*q),
                         sigma = 100*diag(p*q), log = TRUE)
   prior_r <- dunif(r, 0, 1, log = TRUE)
@@ -339,7 +340,7 @@ niters <- 3e4
 
 # Tuning parameters list
 
-tuning_params <- c(0.02, 2e2, 5e-4, 1.5e-2, 1.5e-2)
+tuning_params <- c(0.08, 2.5e2, 1e-3, 1.5e-2, 1.5e-2)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
@@ -349,14 +350,37 @@ theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
 # Saving MCMC chain
 save(theta_chain, file = "separable_mgp_MCMC_chain.Rdata")
 
+
 # Traceplots
 
-plot.ts(theta_chain$phi_sample, ylab = "phi", main = "Traceplot of phi")
+
+trace_phi <- plot.ts(theta_chain$phi_sample, ylab = "phi", main = "Traceplot of phi")
 abline(h = true_phi, col = 'blue', lwd = 2)
 
-plot.ts(theta_chain$nu_sample, ylab = "nu", main = "Traceplot of nu")
+trace_phi <- plot.ts(theta_chain$nu_sample, ylab = "nu", main = "Traceplot of nu")
 abline(h = true_nu, col = 'blue', lwd = 2)
 
-plot.ts(theta_chain$r_sample, ylab = "r", main = "Traceplot of r")
+trace_phi <- plot.ts(theta_chain$r_sample, ylab = "r", main = "Traceplot of r")
 abline(h = true_r, col = 'blue', lwd = 2)
 
+# acfplots
+
+acf_phi <- acf(theta_chain$phi_sample, main = "ACF plot of phi", lag.max = 200)
+acf_nu <- acf(theta_chain$nu_sample, main = "ACF plot of nu", lag.max = 200)
+acf_r <- acf(theta_chain$r_sample, main = "ACF plot of r", lag.max = 200)
+
+
+## Output analysis using SimTools
+traceplot(theta_chain$phi_sample, ylab = "phi",
+          main = "Trace plot of phi")
+abline(h = true_phi, col = "blue")
+acfplot(theta_chain$phi_sample, lag.max = 200, main = "ACF plot of phi")
+out_phi <- as.Smcmc(theta_chain$phi_sample)
+plot(out_phi)
+
+
+out_nu <- as.Smcmc(theta_chain$nu_sample)
+plot(out_nu)
+
+out_r <- as.Smcmc(theta_chain$r_sample)
+plot(out_r)
