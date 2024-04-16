@@ -1,10 +1,4 @@
-rm(list = ls())
-#
-mydir <- "C:/Users/Arghya/OneDrive - IIT Kanpur/arghya/IIT Kanpur PhD documents/Spatial and MCMC Research/Project1/Computing/Multivariate GP_ncp"
-setwd(mydir)
-
-mydir_lab <- "C:/Users/HP/OneDrive - IIT Kanpur/arghya/IIT Kanpur PhD documents/Spatial and MCMC Research/Project1/Computing/Multivariate GP_ncp"
-setwd(mydir_lab)
+# Marginal model is fitted with Sigma = I_q
 
 library(fields)
 library(ggplot2)
@@ -19,8 +13,6 @@ set.seed(3019)
 
 # dimension of the random field
 q <- 2
-
-#as.integer(readline(prompt="Enter the dimension of the random field (q): "))
 
 N <- 2e2 # No. of spatial locations
 
