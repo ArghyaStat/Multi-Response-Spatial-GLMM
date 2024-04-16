@@ -1,4 +1,4 @@
-# See overleaf for the analysis of the separable GP model
+# See overleaf for documentation
 
 library(fields)
 library(ggplot2)
@@ -13,8 +13,6 @@ set.seed(3019)
 
 # dimension of the random field
 q <- 2
-
-#as.integer(readline(prompt="Enter the dimension of the random field (q): "))
 
 N <- 2e2 # No. of spatial locations
 
@@ -331,16 +329,16 @@ metropolis_hastings <- function(beta, Sigma, phi, nu, r, niters,
 # Sample initial parameters
 beta <- matrix(rep(0, p*q), nrow = p, ncol = q)
 Sigma <- diag(q)
-phi <- 0.8
+phi <- 0.5
 nu <- 1
-r <- 0.5
+r <- 0.2
 
 # Number of iterations
-niters <- 3e4
+niters <- 2e4
 
 # Tuning parameters list
 
-tuning_params <- c(0.08, 2.5e2, 1e-3, 1.5e-2, 1.5e-2)
+tuning_params <- c(0.08, 2.5e2, 1e-3, 1.5e-2, 1e-2)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
@@ -350,20 +348,21 @@ theta_chain <- metropolis_hastings(beta, Sigma, phi, nu, r,
 # Saving MCMC chain
 save(theta_chain, file = "separable_mgp_MCMC_chain.Rdata")
 
+theta_chain <- load(file = "separable_mgp_MCMC_chain.Rdata")
 
-# Traceplots
+# Traceplots for phi, nu, r
 
-
+par(mfrow = c(1,1))
 trace_phi <- plot.ts(theta_chain$phi_sample, ylab = "phi", main = "Traceplot of phi")
 abline(h = true_phi, col = 'blue', lwd = 2)
 
-trace_phi <- plot.ts(theta_chain$nu_sample, ylab = "nu", main = "Traceplot of nu")
+trace_nu <- plot.ts(theta_chain$nu_sample, ylab = "nu", main = "Traceplot of nu")
 abline(h = true_nu, col = 'blue', lwd = 2)
 
-trace_phi <- plot.ts(theta_chain$r_sample, ylab = "r", main = "Traceplot of r")
+trace_r <- plot.ts(theta_chain$r_sample, ylab = "r", main = "Traceplot of r")
 abline(h = true_r, col = 'blue', lwd = 2)
 
-# acfplots
+# acfplots for phi, nu, r
 
 acf_phi <- acf(theta_chain$phi_sample, main = "ACF plot of phi", lag.max = 200)
 acf_nu <- acf(theta_chain$nu_sample, main = "ACF plot of nu", lag.max = 200)
@@ -384,3 +383,142 @@ plot(out_nu)
 
 out_r <- as.Smcmc(theta_chain$r_sample)
 plot(out_r)
+
+
+
+
+labels_beta <- list()
+for (i in 1:p) {
+  for (j in 1:q) {
+    labels_beta <- c(labels_beta, 
+                     list(paste0('beta (', i, ',', j, ')')))
+  }
+}
+
+
+
+par(mfrow=c(p,q))
+
+for (i in 1:p) {
+  for (j in 1:q) {
+    plot(1:niters, sapply(theta_chain$beta_sample, function(x) x[i, j]), 
+         type='l', col=1, xlab='Iteration', ylab='beta',
+         main=labels_beta[(i-1)*q + j])
+    abline(h = true_beta[i,j], col = 'blue', lwd = 2)
+    
+  }
+}
+
+par(mfrow=c(p,q))
+
+for (i in 1:p) {
+  for (j in 1:q) {
+    
+    acf(sapply(theta_chain$beta_sample, function(x) x[i, j]), 
+        main = labels_beta[(i-1)*q + j], lag.max = 200)
+    
+  }
+}
+
+
+# Output Analysis of Sigma
+
+labels_Sigma <- list()
+for (i in 1:p) {
+  for (j in 1:q) {
+    labels_Sigma <- c(labels_Sigma, 
+                      list(paste0('Sigma (', i, ',', j, ')')))
+  }
+}
+
+par(mfrow=c(q,q))
+
+for (i in 1:q) {
+  for (j in 1:q) {
+    plot(1:niters, sapply(theta_chain$Sigma_sample, function(x) x[i, j]), 
+         type='l', col=1, xlab='Iteration', ylab='Sigma',
+         main=labels_Sigma[(i-1)*q + j])
+    abline(h = true_Sigma[i,j], col = 'blue', lwd = 2)
+    
+  }
+}
+
+par(mfrow=c(q,q))
+
+for (i in 1:q) {
+  for (j in 1:q) {
+    
+    acf(sapply(theta_chain$Sigma_sample, function(x) x[i, j]), 
+        main=labels_Sigma[(i-1)*q + j],
+        lag.max = 200)
+    
+  }
+}
+
+
+
+
+# Model Comparison
+
+DIC <- function(theta, niters, burnIn, Y_vec, locations) {
+  
+
+  
+  log_like_samples <- numeric(niters - burnIn)
+  
+  post_mean_beta <- matrix(0, p, q)
+  post_mean_Sigma <- matrix(0, q, q)
+  post_mean_phi <- numeric(1)
+  post_mean_nu <- numeric(1)
+  post_mean_r <- numeric(1)
+  
+  for(iter in (burnIn + 1):niters){
+    
+    log_like_samples[iter] <- log_likelihood(theta$beta_sample[[iter]],
+                                             theta$Sigma_sample[[iter]],
+                                             theta$phi_sample[[iter]],
+                                             theta$nu_sample[[iter]],
+                                             theta$r_sample[[iter]],
+                                             Y_vec,
+                                             locations)
+    
+    
+    post_mean_beta <- post_mean_beta + theta$beta_sample[[iter]]
+    post_mean_Sigma <-  post_mean_Sigma + theta$Sigma_sample[[iter]]
+    post_mean_phi <- post_mean_phi + theta$phi_sample[[iter]]
+    post_mean_nu <- post_mean_nu + theta$nu_sample[[iter]]
+    post_mean_r <- post_mean_r + theta$r_sample[[iter]]
+    
+  }
+  
+  post_mean_beta <- post_mean_beta/(niters - burnIn)
+  post_mean_Sigma <- post_mean_Sigma/(niters - burnIn)
+  post_mean_phi <- post_mean_phi/(niters - burnIn)
+  post_mean_nu <- post_mean_nu/(niters - burnIn)
+  post_mean_r <- post_mean_r/(niters - burnIn)
+  
+  # Compute the mean of the log-likelihood samples
+  log_like_mean <- mean(log_like_samples)
+  
+  # likelihood at posterior mean
+  log_like_post <- log_likelihood(post_mean_beta,
+                                  post_mean_Sigma,
+                                  post_mean_phi,
+                                  post_mean_nu,
+                                  post_mean_r,
+                                  Y_vec = Y_vec,
+                                  locations = locations)
+  
+  # Compute the Deviance
+  DIC <- -4 * log_like_mean + 2* log_like_post
+  
+  return(DIC)
+}
+
+
+
+DIC_joint <- DIC(theta = theta_chain, 
+                 niters = 2e4, 
+                 burnIn = 1e4,
+                 Y_vec = Y_vec,
+                 locations = locations)
