@@ -289,7 +289,7 @@ niters <- 2e4
 
 # Tuning parameters list
 
-tuning_params <- c(0.08, 1e-3, 1.5e-2, 1e-2)
+tuning_params <- c(1e-2, 5e-4, 2e-2, 2e-2)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metropolis_hastings(beta, phi, nu, r,
