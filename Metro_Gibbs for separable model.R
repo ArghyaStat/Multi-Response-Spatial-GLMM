@@ -134,14 +134,14 @@ log_likelihood <- function(beta, Sigma, phi, nu, r, Y_vec, locations) {
 }
 
 
-# Define own function for matrix-normal density
+# Define function for matrix-normal density
 dmatnorm <- function(X, M, U, V, log = FALSE) {
   
   p <- nrow(X)
   q <- ncol(X)
   
   denom <- -0.5 * p * q * log(2 * pi)  
-           -0.5 * (q * sum(log(diag(chol(V)))) + p * sum(diag(log(chol(U)))))
+  -0.5 * (p * sum(log(diag(chol(V)))) + q * sum(diag(log(chol(U)))))
   
   if (!isSymmetric(V)) {
     stop("V must be symmetric positive definite.")
@@ -163,21 +163,20 @@ dmatnorm <- function(X, M, U, V, log = FALSE) {
 }
 
 
-# Define own function for inverse-Wishart density
+# Define function for inverse-Wishart density
 
 dinvwish <- function(A, df, S, log = FALSE) {
   
   q <- nrow(A)
   
   const <- (0.5 * q * df) * sum(log(diag(chol(S)))) 
-           - (0.5 * df) * log(2) - lgamma(0.5 * q * df )
+  - (0.5 * df) * log(2) - lgamma(0.5 * q * df ) - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
   
   if (!isSymmetric(A)) {
     stop("A must be symmetric positive definite.")
   }
   
-  exponent <- - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
-              - 0.5 * sum(diag(S %*% chol2inv(chol(A))))
+  exponent <- - 0.5 * sum(diag(S %*% chol2inv(chol(A))))
   
   if (log) {
     return(const + exponent)
@@ -185,8 +184,6 @@ dinvwish <- function(A, df, S, log = FALSE) {
     return(exp(const + exponent))
   }
 }
-
-
 
 # log-posterior of the model parameters
 
