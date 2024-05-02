@@ -2,7 +2,7 @@
 ##### Parameters in the model: B_{p*q}, Sigma_{q*q}, phi, nu, r
 ##### Full conditional distributions of B and Sigma are documented in overleaf section 3.3
 
-ibrary(fields)
+library(fields)
 library(rlist)
 library(mniw)
 library(fBasics)  # For vectorize columns of a matrix
@@ -10,16 +10,12 @@ library(MCMCpack)
 library(mvtnorm)
 library(SimTools)
 
-# For visualization
-library(ggplot2)
-library(viridis)
-library(plot3D)
-
-
 set.seed(3019)
 
 # dimension of the random field
 q <- 2
+
+#as.integer(readline(prompt="Enter the dimension of the random field (q): "))
 
 N <- 2e2 # No. of spatial locations
 
@@ -85,8 +81,8 @@ Omega <- (true_r*K  + (1-true_r)*diag(N)) %x% true_Sigma
 Y_vec <- mu_vec + c(t(chol(Omega)) %*% rnorm(N*q))
 
 # Saving necessary parameters and data
-#save(N,  p, q, locations, X, Y_vec, true_beta,
-     # true_Sigma, true_phi, true_nu, true_r, file = "separable_mgp_data.Rdata")
+save(N,  p, q, locations, X, Y_vec, true_beta,
+     true_Sigma, true_phi, true_nu, true_r, file = "separable_mgp_data.Rdata")
 
 # MCMC Set up
 # Log-likelihood function for Gaussian Process regression using Cholesky decomposition
@@ -134,7 +130,7 @@ log_likelihood <- function(beta, Sigma, phi, nu, r, Y_vec, locations) {
 }
 
 
-# Define function for matrix-normal density
+# Define own function for matrix-normal density
 dmatnorm <- function(X, M, U, V, log = FALSE) {
   
   p <- nrow(X)
@@ -163,14 +159,15 @@ dmatnorm <- function(X, M, U, V, log = FALSE) {
 }
 
 
-# Define function for inverse-Wishart density
+# Define own function for inverse-Wishart density
 
 dinvwish <- function(A, df, S, log = FALSE) {
   
   q <- nrow(A)
   
   const <- (0.5 * q * df) * sum(log(diag(chol(S)))) 
-  - (0.5 * df) * log(2) - lgamma(0.5 * q * df ) - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
+         - (0.5 * df) * log(2) - lgamma(0.5 * q * df ) 
+         - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
   
   if (!isSymmetric(A)) {
     stop("A must be symmetric positive definite.")
@@ -184,6 +181,8 @@ dinvwish <- function(A, df, S, log = FALSE) {
     return(exp(const + exponent))
   }
 }
+
+
 
 # log-posterior of the model parameters
 
@@ -232,6 +231,10 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
   
   accept <- numeric(3)
   
+  distmat <- rdist(locations)
+  
+  
+  
   # Run Metropolis-Hastings
   for (iter in 2:niters) {
     
@@ -241,54 +244,55 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     current_nu <- nu
     current_r <- r
     
-    distmat <- rdist(locations)
     
     K.tilde <- r * Matern(distmat, 
-                                  range = phi, 
-                                  smoothness = nu) + (1- r)*diag(N)
+                          range = phi, 
+                          smoothness = nu) + (1- r)*diag(N)
     
     # Gibbs Update
     
+    # vec to matrix form for compatibility of posterior of B
     Y <- Y_vec
     dim(Y) <- c(N, q)
     
     X <- X_vec
     dim(X) <- c(N, p)
     
-    K.tilde <- r * Matern(distmat, 
-                          range = phi, 
-                          smoothness = nu) + (1- r)*diag(N)
     
-    prec.K.tilde <- chol2inv(chol(K.tilde))
-    prec.V.prior <- chol2inv(chol(V_prior))
-
-    # post_var of B
+    prec.K.tilde <- chol2inv(chol(K.tilde)) ## k.tilde_inverse
+    prec.V.prior <- chol2inv(chol(V_prior)) ## prior_inverse
+    
+    #  Variance of B (column-wise) at full-conditional 
     V_tilde <-  chol2inv(chol(t(X) %*% prec.K.tilde %*% X + prec.V.prior))
-
-    # post_mean of B
+    
+    # Posterior mean of B at full-conditional 
     M_tilde <- V_tilde %*% (t(X) %*% prec.K.tilde %*% Y + 
                               prec.V.prior %*% M_prior )
     
     
-    
+    # Y - XB 
     resid <- (Y - X %*% beta)
-
-    # post_scale matrix of Sigma
+    
+    
+    # Posterior scale matrix at full-conditional 
     S_tilde <- S_prior +  t(resid) %*% prec.K.tilde %*% resid 
-
-    # post_df of Sigma
+    
+    # Posterior df at full-conditional
     df_tilde <- df_prior + N
+    
+    
+    # Generating beta from vec_version vec(B) ~ N_{pq}( Vec(M), Sigma \kron V_tilde
     
     beta <- as.vector(vec(t(M_tilde))) +
       c(t(chol(Sigma %x% V_tilde))  %*% rnorm(p*q))
     
     dim(beta) = c(p,q)
     
+    ## Generating Sigma from Inverse Wishart
+    
     Sigma <- riwish(v = df_tilde, S = S_tilde)
     
-    Sigma <- current_Sigma
-    
-    
+    #### Cross_check with existing package mniw
     # Alternative: simulate n draws using rmniw function form mniw package
     
     # samples <- rMNIW(1, Lambda = M_tilde, Sigma = V_tilde, 
@@ -410,11 +414,11 @@ nu <- 0.5
 r <- 0.8
 
 # Number of iterations
-niters <- 1e4
+niters <- 1e3
 
 # Tuning parameters list
 
-tuning_params <- c(5e-2, 8e-2, 8e-6)
+tuning_params <- c(1e-4, 1e-4, 8e-6)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metro_gibbs(beta, Sigma, phi, nu, r, 
