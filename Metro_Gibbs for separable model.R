@@ -15,8 +15,6 @@ set.seed(3019)
 # dimension of the random field
 q <- 2
 
-#as.integer(readline(prompt="Enter the dimension of the random field (q): "))
-
 N <- 2e2 # No. of spatial locations
 
 #simulating N locations over [0,1]^2 in locations matrix
@@ -166,8 +164,8 @@ dinvwish <- function(A, df, S, log = FALSE) {
   q <- nrow(A)
   
   const <- (0.5 * q * df) * sum(log(diag(chol(S)))) 
-         - (0.5 * df) * log(2) - lgamma(0.5 * q * df ) 
-         - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
+  - (0.5 * df) * log(2) - lgamma(0.5 * q * df ) 
+  - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
   
   if (!isSymmetric(A)) {
     stop("A must be symmetric positive definite.")
@@ -215,13 +213,13 @@ log_posterior <- function(beta, Sigma, phi, nu, r, Y_vec, locations){
 
 metro_gibbs <- function(beta, Sigma, phi, nu, r, 
                         niters, locations, Y_vec, X_vec,
-                             # priors
-                             M_prior ,
-                             V_prior ,
-                             S_prior,
-                             df_prior,
-                             #tuning params for MH
-                             tuning_params) {
+                        # priors
+                        M_prior ,
+                        V_prior ,
+                        S_prior,
+                        df_prior,
+                        #tuning params for MH
+                        tuning_params) {
   
   beta_chain <- replicate(niters, matrix(0, p, q), simplify = F)
   Sigma_chain <- replicate(niters, matrix(0, q, q), simplify = F)
@@ -233,25 +231,28 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
   
   distmat <- rdist(locations)
   
+  prec.V.prior <- chol2inv(chol(V_prior)) ## prior of V inverse
   
-  
-  # Run Metropolis-Hastings
+  # Run Gibbs for beta, Sigma and MH for phi, nu, r 
   for (iter in 2:niters) {
     
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
     
+    current_beta <- beta
+    current_Sigma <- Sigma
     current_phi <- phi
     current_nu <- nu
     current_r <- r
     
-    
+    # Computing the spatial covariance matrix across all locations
+    # K.tilde is inside the loop as it takes phi, r, nu  
     K.tilde <- r * Matern(distmat, 
                           range = phi, 
                           smoothness = nu) + (1- r)*diag(N)
     
     # Gibbs Update
     
-    # vec to matrix form for compatibility of posterior of B
+    # 'vec' to matrix form for compatibility of posterior of B
     Y <- Y_vec
     dim(Y) <- c(N, q)
     
@@ -260,7 +261,7 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     
     
     prec.K.tilde <- chol2inv(chol(K.tilde)) ## k.tilde_inverse
-    prec.V.prior <- chol2inv(chol(V_prior)) ## prior_inverse
+    
     
     #  Variance of B (column-wise) at full-conditional 
     V_tilde <-  chol2inv(chol(t(X) %*% prec.K.tilde %*% X + prec.V.prior))
@@ -269,8 +270,17 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     M_tilde <- V_tilde %*% (t(X) %*% prec.K.tilde %*% Y + 
                               prec.V.prior %*% M_prior )
     
+    # Generating beta from vec_version vec(B) ~ N_{pq}( Vec(M), Sigma \kron V_tilde
     
-    # Y - XB 
+    current_beta <- as.vector(vec(t(M_tilde))) +
+      c(t(chol(Sigma %x% V_tilde))  %*% rnorm(p*q))
+
+    # Updating beta with generated current_beta
+    beta <- current_beta
+    
+    dim(beta) = c(p,q)
+    
+    # Y - XB  (Using updated beta)
     resid <- (Y - X %*% beta)
     
     
@@ -281,19 +291,15 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     df_tilde <- df_prior + N
     
     
-    # Generating beta from vec_version vec(B) ~ N_{pq}( Vec(M), Sigma \kron V_tilde
-    
-    beta <- as.vector(vec(t(M_tilde))) +
-      c(t(chol(Sigma %x% V_tilde))  %*% rnorm(p*q))
-    
-    dim(beta) = c(p,q)
-    
     ## Generating Sigma from Inverse Wishart
     
-    Sigma <- riwish(v = df_tilde, S = S_tilde)
+    current_Sigma <- riwish(v = df_tilde, S = S_tilde)
+
+    # Updating Sigma with generated current_Sigma
+    Sigma <- current_Sigma
     
     #### Cross_check with existing package mniw
-    # Alternative: simulate n draws using rmniw function form mniw package
+    # Alternative: simulate matrix-normal and inv-wish using rmniw function form mniw package
     
     # samples <- rMNIW(1, Lambda = M_tilde, Sigma = V_tilde, 
     #                  Psi = S_tilde, nu = df_tilde)
@@ -307,7 +313,7 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     
     current_phi <- rnorm(1, phi, sqrt(tuning_params[1]))
     
-    # Compute log posterior for the proposed value
+    # Compute log posterior for the proposed value of phi
     log.r_phi <- log_posterior(beta,
                                Sigma,
                                current_phi,
@@ -332,7 +338,7 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     
     current_nu <- rnorm(1, nu, sqrt(tuning_params[2]))
     
-    # Compute log posterior for the proposed value
+    # Compute log posterior for the proposed value of nu
     log.r_nu <- log_posterior(beta,
                               Sigma,
                               phi,
@@ -358,7 +364,7 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
     current_r <- rnorm(1, r, sqrt(tuning_params[3]))
     
     
-    # Compute log posterior for the proposed value
+    # Compute log posterior for the proposed value of r
     log.r_r <- log_posterior(beta,
                              Sigma,
                              phi,
@@ -380,7 +386,6 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
       accept[3] <- accept[3] + 1
       
     }
-    
     
     beta_chain[[iter]] <- beta
     Sigma_chain[[iter]] <- Sigma
@@ -405,7 +410,7 @@ metro_gibbs <- function(beta, Sigma, phi, nu, r,
 
 # Sample initial parameters
 beta <- true_beta
-  
+
 #matrix(rep(0, p*q), nrow = p, ncol = q)
 Sigma <- true_Sigma
 #diag(q)
@@ -418,18 +423,18 @@ niters <- 1e3
 
 # Tuning parameters list
 
-tuning_params <- c(1e-4, 1e-4, 8e-6)
+tuning_params <- c(8e-3, 1e-3, 5e-6)
 
 # Run Metropolis-Hastings algorithm
 theta_chain <- metro_gibbs(beta, Sigma, phi, nu, r, 
-                                   niters, locations, Y_vec, X_vec,
-                                   # priors
-                                   M_prior = matrix(0, p, q) ,
-                                   V_prior = 1e4*diag(p) ,
-                                   S_prior = diag(q),
-                                   df_prior = q + 1,
-                                   #tuning params for MH
-                                   tuning_params = tuning_params)
+                           niters, locations, Y_vec, X_vec,
+                           # priors
+                           M_prior = matrix(0, p, q) ,
+                           V_prior = 1e4*diag(p) ,
+                           S_prior = diag(q),
+                           df_prior = q + 1,
+                           #tuning params for MH
+                           tuning_params = tuning_params)
 
 # Saving MCMC chain
 list.save(theta_chain, file = "separable_mgp_metro_gibbs.Rdata")
