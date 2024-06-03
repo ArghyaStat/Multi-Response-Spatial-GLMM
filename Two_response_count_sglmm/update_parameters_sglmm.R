@@ -62,18 +62,16 @@ log.likelihood <- function(W.tilde, Y, N) {
     
     lambda1 <- exp(W.tilde[,1])
     lambda2 <- exp(W.tilde[,2])
-    
-    
+      
     like.count1 <- sum(dpois(Y[,1], lambda = lambda1, log = T))
     like.count2 <- sum(dpois(Y[,2], lambda = lambda2, log = T))  
-    
     
     like.out <- like.count1 + like.count2
   
   return(like.out)
 }
 
-
+## The function for pre-computing the K.tilde
 
 cormat.update <- function(distmat, phi, nu, r, N){
   
