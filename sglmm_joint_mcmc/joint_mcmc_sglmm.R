@@ -10,11 +10,7 @@ joint.mcmc.sglmm <- function(Y, X, locations,
   
   
   library(fields)
-  
-  
   N <- nrow(Y)
-  
-  d <- rdist(locations)
   
   chol.V.prior <- chol(V.prior)
   prec.V.prior <- chol2inv(chol.V.prior)
@@ -36,8 +32,7 @@ joint.mcmc.sglmm <- function(Y, X, locations,
   # Run Metropolis-Hastings
   for (iter in 1:niters) {
     
-    if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
-    
+    if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%")) 
     
     ### W.tilde update
     
@@ -45,9 +40,8 @@ joint.mcmc.sglmm <- function(Y, X, locations,
     
     can.W.tilde <- W.tilde + W.error
     
-    
-    log.r.W.tilde <- log.posterior(can.W.tilde, beta, Sigma, phi, nu, r, Y, X, locations) 
-                    -log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
+    log.r.W.tilde <- log.posterior(can.W.tilde, beta, Sigma, phi, nu, r, Y, X, locations) - 
+                     log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
     
     if(log(runif(1)) < log.r.W.tilde){
       
@@ -56,10 +50,7 @@ joint.mcmc.sglmm <- function(Y, X, locations,
       
     }
     
-    
-    
     ### beta_update 
-    
     
     K.tilde <- r * Matern(distmat, 
                           range = phi, 
@@ -100,8 +91,8 @@ joint.mcmc.sglmm <- function(Y, X, locations,
     can.phi <- rnorm(1, phi, sqrt(tuning.phi))
     
     # Compute log posterior for the proposed value
-    log.r.phi <- log.posterior(W.tilde, beta, Sigma, can.phi, nu, r, Y, X, locations) 
-                -log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
+    log.r.phi <- log.posterior(W.tilde, beta, Sigma, can.phi, nu, r, Y, X, locations) - 
+                 log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
     
     # Accept or reject
     if (log(runif(1)) < log.r.phi) {
@@ -116,8 +107,8 @@ joint.mcmc.sglmm <- function(Y, X, locations,
     can.nu <- rnorm(1, nu, sqrt(tuning.nu))
     
     
-    log.r.nu <- log.posterior(W.tilde, beta, Sigma, phi, can.nu, r, Y, X, locations) 
-               -log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
+    log.r.nu <- log.posterior(W.tilde, beta, Sigma, phi, can.nu, r, Y, X, locations) - 
+                log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
     
     # Accept or reject
     if (log(runif(1)) < log.r.nu) {
@@ -132,8 +123,8 @@ joint.mcmc.sglmm <- function(Y, X, locations,
     can.r <- rnorm(1, r, sqrt(tuning.r))
     
     
-    log.r.r <- log.posterior(W.tilde, beta, Sigma, phi, nu, can.r, Y, X, locations) 
-              -log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
+    log.r.r <- log.posterior(W.tilde, beta, Sigma, phi, nu, can.r, Y, X, locations) - 
+               log.posterior(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations)
     
     # Accept or reject
     if (log(runif(1)) < log.r.r) {
