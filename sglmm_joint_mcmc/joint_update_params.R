@@ -16,7 +16,7 @@ dmatnorm <- function(X, M, U, V, log = FALSE) {
   chol.V <- chol(V)
   
   
-  denom <- -0.5 * (p * q * log(2 * pi) + q * sum(log(diag(chol.V))) + p * sum(log(diag(chol.U))))
+  denom <- -0.5 * (p * q * log(2 * pi) + 2*q * sum(log(diag(chol.V))) + 2*p * sum(log(diag(chol.U))))
   
   V.prec <- chol2inv(chol.V)
   U.prec <- chol2inv(chol.U)
@@ -85,7 +85,7 @@ log.posterior <- function(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations){
                           log = TRUE)
   prior.beta <- dmatnorm(X = beta, 
                          M = matrix(0, p, q), 
-                         U = 1e4 * diag(p),
+                         U = 1e2 * diag(p),
                          V = Sigma,
                          log = TRUE)
   
@@ -115,6 +115,5 @@ log.posterior <- function(W.tilde, beta, Sigma, phi, nu, r, Y, X, locations){
     
     return(-Inf)
   }
-  
-  
+    
 }
