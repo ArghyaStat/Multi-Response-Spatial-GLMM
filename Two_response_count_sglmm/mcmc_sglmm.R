@@ -3,7 +3,7 @@
 mcmc.sglmm <- function(Y, X, locations,
                     W.tilde, beta, Sigma, phi, nu, r, N,
                     # priors
-                    M.prior, V.prior, S.prior, df.prior, distmat,
+                    M.prior, V.prior, S.prior, df.prior,
                     # mcmc settings
                     niters, tuning.W.tilde, tuning.phi, tuning.nu, tuning.r){
   
@@ -13,11 +13,11 @@ mcmc.sglmm <- function(Y, X, locations,
   
   N <- nrow(Y)
   
-  d <- rdist(locations)
+  distmat <- rdist(locations)
   
   # Initialization of K.tilde and K.tilde.inv
   
-  cormat.details <- cormat.update(d, phi, nu, r, N)
+  cormat.details <- cormat.update(distmat, phi, nu, r, N)
   K.tilde <- cormat.details$cormat
   K.tilde.inv <- cormat.details$cormat.inv
   
@@ -32,18 +32,13 @@ mcmc.sglmm <- function(Y, X, locations,
   nu.chain <-  rep(0, niters)
   r.chain <-  rep(0, niters)
   
-  beta <- beta
-  Sigma <- Sigma 
-  phi <- phi
-  nu <- nu
-  r <- r
   
   for(iter in 1:niters){
     
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
      
     
-     W.tilde.update.details <- update.W.tilde(beta, Sigma, r, phi, nu, Y, X, N, K.tilde,
+     W.tilde.update.details <- update.W.tilde(W.tilde, beta, Sigma, r, phi, nu, Y, X, N, K.tilde,
                                              distmat, acc.W.tilde, tuning.W.tilde)
     
      W.tilde <- W.tilde.update.details$W.tilde
@@ -51,14 +46,14 @@ mcmc.sglmm <- function(Y, X, locations,
      
      #print(W.tilde)
      
-     Sigma <- update.Sigma(W.tilde, X, K.tilde.inv,
+     beta <- update.beta(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior)
+     
+     #print(beta)
+     
+     Sigma <- update.Sigma(W.tilde, beta, X, K.tilde.inv,
                            M.prior, V.prior, S.prior, df.prior, N)
      
      #print(Sigma)
-
-     beta <- update.beta(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior)
-    
-     #print(beta)
     
      phi.update.details <- update.phi(phi, beta, Sigma, nu, r, W.tilde, distmat,
                                       K.tilde, K.tilde.inv, acc.phi, tuning.phi)
@@ -90,7 +85,6 @@ mcmc.sglmm <- function(Y, X, locations,
      
      #print(r)
 
-    
 
      W.tilde.chain[[iter]] <- W.tilde
      beta.chain[[iter]] <- beta
