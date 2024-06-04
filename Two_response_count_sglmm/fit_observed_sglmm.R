@@ -5,8 +5,8 @@ library(fields)
 library(MCMCpack)
 library(rlist)
 
-# mydir <- this.path::here()
-# setwd(mydir)
+mydir <- this.path::here()
+setwd(mydir)
 
 load("sglmm.mgp.simulation.Rdata")
 
@@ -49,7 +49,7 @@ df.prior <- q + 1
 fit.observed.sglmm <- mcmc.sglmm(Y, X, locations,
                            W.tilde, beta, Sigma, phi, nu, r, N,
                            # priors
-                           M.prior, V.prior, S.prior, df.prior, distmat,
+                           M.prior, V.prior, S.prior, df.prior,
                            # mcmc settings
                            niters, tuning.W.tilde, tuning.phi, tuning.nu, tuning.r)
 
@@ -72,12 +72,11 @@ abline(h = true.r, col = 'blue', lwd = 2)
 
 # acfplots
 
-acf.phi <- acf(theta.chain$phi.sample, main = "ACF plot of phi", lag.max = 100)
-acf.nu <- acf(theta.chain$nu.sample, main = "ACF plot of nu", lag.max = 100)
-acf.r <- acf(theta.chain$r.sample, main = "ACF plot of r", lag.max = 100)
+acf.phi <- acf(theta.chain$phi.sample, main = "ACF plot of phi", lag.max = 200)
+acf.nu <- acf(theta.chain$nu.sample, main = "ACF plot of nu", lag.max = 200)
+acf.r <- acf(theta.chain$r.sample, main = "ACF plot of r", lag.max = 200)
 
-## Traceplots and ACF plots of regression matrix componenets
-
+#### Traceplots and ACF plots for beta components
 labels.beta <- list()
 for (i in 1:p) {
   for (j in 1:q) {
@@ -110,7 +109,7 @@ for (i in 1:p) {
 }
 
 
-# Traceplots and ACF plots of components of Sigma
+#### Traceplots and ACF plots for Sigma components
 
 labels.Sigma <- list()
 for (i in 1:p) {
@@ -143,5 +142,3 @@ for (i in 1:q) {
     
   }
 }
-
-
