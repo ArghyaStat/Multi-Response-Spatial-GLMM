@@ -16,7 +16,7 @@ dmatnorm <- function(X, M, U, V, log = FALSE) {
   chol.V <- chol(V)
   
   
-  denom <- -0.5 * (p * q * log(2 * pi) + q * sum(log(diag(chol.V))) + p * sum(log(diag(chol.U))))
+  denom <- -0.5 * (p * q * log(2 * pi) + 2*q * sum(log(diag(chol.V))) + 2*p * sum(log(diag(chol.U))))
   
   V.prec <- chol2inv(chol.V)
   U.prec <- chol2inv(chol.U)
@@ -62,16 +62,18 @@ log.likelihood <- function(W.tilde, Y, N) {
     
     lambda1 <- exp(W.tilde[,1])
     lambda2 <- exp(W.tilde[,2])
-      
+    
+    
     like.count1 <- sum(dpois(Y[,1], lambda = lambda1, log = T))
     like.count2 <- sum(dpois(Y[,2], lambda = lambda2, log = T))  
+    
     
     like.out <- like.count1 + like.count2
   
   return(like.out)
 }
 
-## The function for pre-computing the K.tilde
+
 
 cormat.update <- function(distmat, phi, nu, r, N){
   
@@ -87,7 +89,7 @@ cormat.update <- function(distmat, phi, nu, r, N){
 }
 
 
-update.W.tilde <- function(beta, Sigma, r, phi, nu, Y, X, N, 
+update.W.tilde <- function(W.tilde, beta, Sigma, r, phi, nu, Y, X, N, 
                            K.tilde, distmat, acc.W.tilde, tuning.W.tilde){
   
   q <- nrow(Sigma)
@@ -98,18 +100,18 @@ update.W.tilde <- function(beta, Sigma, r, phi, nu, Y, X, N,
                                      U = K.tilde,
                                      V = Sigma,
                                      log = TRUE)
-  W.samp <- matrix(rnorm(N*q, 0, 1), nrow = N, ncol = q)
+  W.error <- sqrt(tuning.W.tilde) * matrix(rnorm(N*q, 0, 1), nrow = N, ncol = q)
   
   # Sampling form matrix-normal using cholesky decomposition
   
-  can.W.tilde <- W.tilde + sqrt(tuning.W.tilde)*diag(N) %*% W.samp %*% diag(q)
+  can.W.tilde <- W.tilde + W.error
   
   post.can.W.tilde <- log.likelihood(can.W.tilde, Y, N) +
-    dmatnorm(can.W.tilde,
-             M = X %*% beta,
-             U = K.tilde,
-             V = Sigma,
-             log = TRUE)
+                            dmatnorm(can.W.tilde,
+                                     M = X %*% beta,
+                                     U = K.tilde,
+                                     V = Sigma,
+                                    log = TRUE)
   
   log.r.W.tilde <- post.can.W.tilde - post.W.tilde
   
@@ -141,14 +143,14 @@ update.beta <- function(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior){
   
   beta.samp <- matrix(rnorm(p*q, 0, 1), nrow = p , ncol = q)
   
-  beta <- M.tilde + chol.V.tilde %*% beta.samp %*% chol.Sigma
+  beta <- M.tilde + t(chol.V.tilde) %*% beta.samp %*% chol.Sigma
   
   beta
   
 }
   
 
-update.Sigma <- function(W.tilde, X, K.tilde.inv, 
+update.Sigma <- function(W.tilde, beta, X, K.tilde.inv, 
                          M.prior, V.prior, S.prior, df.prior, N){
   
   p <- nrow(V.prior)
@@ -230,7 +232,7 @@ update.nu <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
                        U = K.tilde,
                        V = Sigma,
                        log = TRUE) + 
-    dlnorm(nu, meanlog = -1.2, sdlog = 1, log = TRUE)
+             dlnorm(nu, meanlog = - 1.2, sdlog = 1, log = TRUE)
   
   
     can.nu <- rnorm(1, nu, sqrt(tuning.nu))
@@ -250,7 +252,7 @@ update.nu <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
                              U = can.K.tilde,
                              V = Sigma,
                              log = TRUE) + 
-      dlnorm(can.nu, meanlog = -1.2, sdlog = 1, log = TRUE)
+                   dlnorm(can.nu, meanlog = -1.2, sdlog = 1, log = TRUE)
     
     
     
