@@ -8,7 +8,7 @@ library(rlist)
 mydir <- this.path::here()
 setwd(mydir)
 
-load("sglmm.mgp.simulation.Rdata")
+load("sglmm.simulation.Rdata")
 
 #--------------------
 
@@ -26,20 +26,20 @@ nu <- true.nu
 r <- true.r
 
 # Number of iterations
-niters <- 1e3
+niters <- 1e4
 
 # Tuning parameters list
 
-tuning.W.tilde <- 1e-5 
-tuning.phi <- 1e-4
-tuning.nu <- 3e-2 
-tuning.r <- 1e-6
+tuning.W.tilde <- 5e-3
+tuning.phi <- 1e-2
+tuning.nu <- 8e-2 
+tuning.r <- 5e-2
 
 distmat <- rdist(locations)
 
 p <- 3
 q <- 2
-N <- 2e2
+N <- 5e2
 
 M.prior <- matrix(0, p, q)
 V.prior <- 1e2 * diag(p) 
@@ -76,7 +76,10 @@ acf.phi <- acf(theta.chain$phi.sample, main = "ACF plot of phi", lag.max = 200)
 acf.nu <- acf(theta.chain$nu.sample, main = "ACF plot of nu", lag.max = 200)
 acf.r <- acf(theta.chain$r.sample, main = "ACF plot of r", lag.max = 200)
 
-#### Traceplots and ACF plots for beta components
+
+
+
+
 labels.beta <- list()
 for (i in 1:p) {
   for (j in 1:q) {
@@ -84,6 +87,8 @@ for (i in 1:p) {
                      list(paste0('beta (', i, ',', j, ')')))
   }
 }
+
+
 
 par(mfrow=c(p,q))
 
@@ -109,7 +114,7 @@ for (i in 1:p) {
 }
 
 
-#### Traceplots and ACF plots for Sigma components
+# Output Analysis of Sigma
 
 labels.Sigma <- list()
 for (i in 1:p) {
