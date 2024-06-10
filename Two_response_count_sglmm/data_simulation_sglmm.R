@@ -19,8 +19,7 @@ set.seed(1e3)
 # dimension of the random field
 q <- 2
 
-
-N <- 2e2 # No. of spatial locations
+N <- 5e2 # No. of spatial locations
 
 #simulating N locations over [0,1]^2 in locations matrix
 
@@ -30,27 +29,19 @@ locations[, 1] <- runif(N)
 locations[, 2] <- runif(N)
 
 # Adding a mean term
-
 X = cbind(1, locations)
-
-#design matrix in concatenated form of dim (Np * 1)
-X.vec <- vec(t(X))
 
 #Number of features in the spatial model
 p <- ncol(X)
 
 # True value of regression matrix beta
-true.beta <- matrix(rnorm(p * q, mean = 0, sd = 1), nrow = p, ncol = q)
+true.beta <- matrix(rnorm(p * q, mean = 0, sd = 2), nrow = p, ncol = q)
 
-#beta.mat is the kronecker product of the coefficient matrix across locations
+# Fixed effect Vec(XB)
+mu.vec <- vec(X %*% true.beta)
 
-beta.mat <- diag(N) %x% t(true.beta)
-
-# Fixed effect (I_n * B^T) X
-mu.vec <- c(beta.mat %*% X.vec)
-
-
-true.Sigma <- matrix(c(0.8, 0.4, 0.4, 0.5), nrow = q, ncol = q, byrow = TRUE)
+# true.Sigma
+true.Sigma <- matrix(c(3, 2, 2, 4), nrow = q, ncol = q, byrow = TRUE)
 
 # true.phi
 
@@ -62,7 +53,7 @@ true.nu <- 0.5
 
 #true.r
 
-true.r <- 0
+true.r <- 0.8
 
 # Calculates the Euclidean distance matrix
 
@@ -97,8 +88,6 @@ inv.link <- function(x, link) {
   }
 }
 
-
-
 Y.vec <- rep(0, N*q)  
 
 for(i in 1: N*q){
@@ -113,5 +102,5 @@ Y <- array(Y.vec, dim = c(N, q))
 
 # Saving necessary parameters and data (all in matrix form)
 save(N, p, q, locations, X, Y, W.mat, true.beta,
-     true.Sigma, true.phi, true.nu, true.r, file = "joint.sglmm.simulation.Rdata")
+     true.Sigma, true.phi, true.nu, true.r, file = "sglmm.simulation.Rdata")
 
