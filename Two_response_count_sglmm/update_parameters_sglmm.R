@@ -37,14 +37,14 @@ dinvwish <- function(A, df, S, log = FALSE) {
   
   q <- nrow(A)
   
-  const <- (0.5 * q * df) * sum(log(diag(chol(S)))) 
+  const <- (q * df) * sum(log(diag(chol(S)))) 
   - (0.5 * df) * log(2) - lgamma(0.5 * q * df )
   
   if (!isSymmetric(A)) {
     stop("A must be symmetric positive definite.")
   }
   
-  exponent <- - 0.5 * (df + q + 1) * sum(log(diag(chol(A)))) 
+  exponent <- - (df + q + 1) * sum(log(diag(chol(A)))) 
   - 0.5 * sum(diag(S %*% chol2inv(chol(A))))
   
   if (log) {
@@ -187,7 +187,7 @@ update.phi <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
   
   # cormat details for candidate phi
   
-  if(can.phi > 0 & can.phi < 1){
+  if(can.phi > 0 ){
   
   can.cormat.details <- cormat.update(distmat, can.phi, nu, r, N)
   
