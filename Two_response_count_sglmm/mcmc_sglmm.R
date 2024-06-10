@@ -32,29 +32,32 @@ mcmc.sglmm <- function(Y, X, locations,
   nu.chain <-  rep(0, niters)
   r.chain <-  rep(0, niters)
   
+  W.tilde.chain[[1]] <- W.tilde
+  beta.chain[[1]] <- beta
+  Sigma.chain[[1]] <- Sigma
+  phi.chain[1] <- phi
+  nu.chain[1] <- nu
+  r.chain[1] <- r
   
-  for(iter in 1:niters){
+  
+  for(iter in 2:niters){
     
     if(iter %% ((niters)/10) == 0) print(paste0(100*(iter/(niters)), "%"))
      
     
      W.tilde.update.details <- update.W.tilde(W.tilde, beta, Sigma, r, phi, nu, Y, X, N, K.tilde,
                                              distmat, acc.W.tilde, tuning.W.tilde)
-    
+
      W.tilde <- W.tilde.update.details$W.tilde
      acc.W.tilde <- W.tilde.update.details$acc.W.tilde
      
-     #print(W.tilde)
      
      beta <- update.beta(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior)
-     
-     #print(beta)
      
      Sigma <- update.Sigma(W.tilde, beta, X, K.tilde.inv,
                            M.prior, V.prior, S.prior, df.prior, N)
      
-     #print(Sigma)
-    
+
      phi.update.details <- update.phi(phi, beta, Sigma, nu, r, W.tilde, distmat,
                                       K.tilde, K.tilde.inv, acc.phi, tuning.phi)
 
@@ -62,8 +65,8 @@ mcmc.sglmm <- function(Y, X, locations,
      K.tilde <- phi.update.details$cormat
      K.tilde.inv <- phi.update.details$cormat.inv
      acc.phi <- phi.update.details$acc.phi
-     
-     #print(phi)
+
+
 
      nu.update.details  <- update.nu(phi, beta, Sigma, nu, r, W.tilde, distmat,
                                      K.tilde, K.tilde.inv, acc.nu, tuning.nu)
@@ -72,8 +75,8 @@ mcmc.sglmm <- function(Y, X, locations,
      K.tilde <- nu.update.details$cormat
      K.tilde.inv <- nu.update.details$cormat.inv
      acc.nu <- nu.update.details$acc.nu
-     
-     #print(nu)
+
+
 
      r.update.details <- update.r(phi, beta, Sigma, nu, r, W.tilde, distmat,
                                     K.tilde, K.tilde.inv, acc.r, tuning.r)
@@ -82,8 +85,6 @@ mcmc.sglmm <- function(Y, X, locations,
      K.tilde <- r.update.details$cormat
      K.tilde.inv <- r.update.details$cormat.inv
      acc.r <- r.update.details$acc.r
-     
-     #print(r)
 
 
      W.tilde.chain[[iter]] <- W.tilde
