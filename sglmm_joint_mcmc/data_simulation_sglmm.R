@@ -14,7 +14,7 @@ library(fields)
 library(fBasics)  # For vectorize columns of a matrix
 library(rlist)
 
-set.seed(1000)
+set.seed(1e3)
 
 # dimension of the random field
 q <- 2
@@ -40,7 +40,7 @@ X.vec <- vec(t(X))
 p <- ncol(X)
 
 # True value of regression matrix beta
-true.beta <- matrix(rnorm(p * q, mean = 0, sd = 2), nrow = p, ncol = q)
+true.beta <- matrix(rnorm(p * q, mean = 0, sd = 1), nrow = p, ncol = q)
 
 #beta.mat is the kronecker product of the coefficient matrix across locations
 
@@ -50,7 +50,7 @@ beta.mat <- diag(N) %x% t(true.beta)
 mu.vec <- c(beta.mat %*% X.vec)
 
 
-true.Sigma <- matrix(c(3, 1, 1, 2), nrow = q, ncol = q, byrow = TRUE)
+true.Sigma <- matrix(c(0.8, 0.4, 0.4, 0.5), nrow = q, ncol = q, byrow = TRUE)
 
 # true.phi
 
@@ -62,7 +62,7 @@ true.nu <- 0.5
 
 #true.r
 
-true.r <- 0.8
+true.r <- 0
 
 # Calculates the Euclidean distance matrix
 
@@ -74,7 +74,7 @@ K <- Matern(distmat, range = true.phi, smoothness = true.nu)
 
 # Calculates the separable covariance matrix with nugget effect
 
-Omega <- (true.r*K  + (1-true.r)*diag(N)) %x% true.Sigma
+Omega <- true.Sigma %x% (true.r*K  + (1-true.r)*diag(N))
 
 # Generating the response vector of dimension Nq*1
 
@@ -113,5 +113,5 @@ Y <- array(Y.vec, dim = c(N, q))
 
 # Saving necessary parameters and data (all in matrix form)
 save(N, p, q, locations, X, Y, W.mat, true.beta,
-     true.Sigma, true.phi, true.nu, true.r, file = "sglmm.mgp.simulation.Rdata")
+     true.Sigma, true.phi, true.nu, true.r, file = "joint.sglmm.simulation.Rdata")
 
