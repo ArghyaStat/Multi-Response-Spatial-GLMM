@@ -1,7 +1,6 @@
 # Define own function for matrix-normal density
 dmatnorm <- function(X, M, U, V, log = FALSE) {
 
-  
   if (!isSymmetric(V)) {
     stop("V must be symmetric positive definite.")
   }
@@ -16,7 +15,7 @@ dmatnorm <- function(X, M, U, V, log = FALSE) {
   chol.V <- chol(V)
   
   
-  denom <- -0.5 * (p * q * log(2 * pi) + 2*q * sum(log(diag(chol.V))) + 2*p * sum(log(diag(chol.U))))
+  denom <- -0.5 * (p * q * log(2 * pi) + 2*p * sum(log(diag(chol.V))) + 2*q * sum(log(diag(chol.U))))
   
   V.prec <- chol2inv(chol.V)
   U.prec <- chol2inv(chol.U)
@@ -73,7 +72,7 @@ log.likelihood <- function(W.tilde, Y, N) {
   return(like.out)
 }
 
-
+### Pre-computing of matrices
 
 cormat.update <- function(distmat, phi, nu, r, N){
   
@@ -88,6 +87,7 @@ cormat.update <- function(distmat, phi, nu, r, N){
        cormat.inv = K.tilde.inv)
 }
 
+### Update the random effect W.tilde
 
 update.W.tilde <- function(W.tilde, beta, Sigma, r, phi, nu, Y, X, N, 
                            K.tilde, distmat, acc.W.tilde, tuning.W.tilde){
@@ -127,8 +127,7 @@ update.W.tilde <- function(W.tilde, beta, Sigma, r, phi, nu, Y, X, N,
   results
 }
 
-
-
+### Update beta
 update.beta <- function(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior){
   
   chol.V.prior <- chol(V.prior)
@@ -148,7 +147,8 @@ update.beta <- function(W.tilde, Sigma, X, K.tilde.inv, M.prior, V.prior){
   beta
   
 }
-  
+
+### Update Sigma
 
 update.Sigma <- function(W.tilde, beta, X, K.tilde.inv, 
                          M.prior, V.prior, S.prior, df.prior, N){
@@ -172,6 +172,7 @@ update.Sigma <- function(W.tilde, beta, X, K.tilde.inv,
   Sigma
 }
 
+### Update phi
 
 update.phi <- function(phi, beta, Sigma, nu, r, W.tilde, distmat, 
                        K.tilde, K.tilde.inv, acc.phi, tuning.phi){
@@ -222,7 +223,7 @@ update.phi <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
   
 }
 
-
+### update nu
 
 update.nu <- function(phi, beta, Sigma, nu, r, W.tilde, distmat, 
                       K.tilde, K.tilde.inv, acc.nu, tuning.nu){
@@ -237,7 +238,7 @@ update.nu <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
   
     can.nu <- rnorm(1, nu, sqrt(tuning.nu))
   
-  # cormat details for candidate phi
+  # cormat details for candidate nu
   
   if(can.nu > 0){
     
@@ -275,7 +276,7 @@ update.nu <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
   
 }
 
-
+### update r
 
 update.r <- function(phi, beta, Sigma, nu, r, W.tilde, distmat, 
                      K.tilde, K.tilde.inv, acc.r, tuning.r){
@@ -290,7 +291,7 @@ update.r <- function(phi, beta, Sigma, nu, r, W.tilde, distmat,
   
   can.r <- rnorm(1, r, sqrt(tuning.r))
   
-  # cormat details for candidate phi
+  # cormat details for candidate r
   
   if(can.r > 0 & can.r < 1){
     
