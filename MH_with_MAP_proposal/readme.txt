@@ -1,0 +1,1 @@
+This folder contains codes of mcmc for updating W eith independent Gaussian proposal with conditional MAP as mean and Hessian as the precision matrix. The phi is updated by truncated normal proposal and Sigma-beta as Blocked-Gibbs
