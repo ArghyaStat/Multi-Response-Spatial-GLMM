@@ -49,7 +49,7 @@ sim.data <- function(q, N, family, true.beta, true.Sigma,
     } else if (family[j] == "Poisson") {
       Y[, j] <- rpois(N, lambda = exp(true.W[, j]))
     } else if (family[j] == "Binomial") {
-      Y[, j] <- rbinom(N, size = 1, prob = (exp(-true.W[, j]) / (1 + exp(-true.W[, j]))))
+      Y[, j] <- rbinom(N, size = 1, prob = (exp(true.W[, j]) / (1 + exp(true.W[, j]))))
     } else if (family[j] == "Gamma") {
       Y[, j] <- rgamma(N, shape = exp(true.W[, j]), rate = 1)
     } else if (family[j] == "Negative-Binomial") {
